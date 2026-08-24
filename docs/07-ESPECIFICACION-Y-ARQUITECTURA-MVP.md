@@ -2,7 +2,7 @@
 
 ## Estado del documento
 
-**Estado:** especificación funcional aprobada. Gate 0 cerrado con decisiones de avance para iniciar el primer flujo.
+**Estado:** especificación funcional aprobada. Gate 0 cerrado con decisiones de avance para iniciar el primer flujo. La base técnica inicial de Payload/Next.js ya fue creada en la raíz del repositorio; el desarrollo de los flujos de negocio continúa sujeto a esta especificación.
 
 Este documento reúne las decisiones tomadas durante la definición del producto. No habilita por sí solo el comienzo del desarrollo: los bloqueos operativos y de infraestructura de la sección final deben validarse primero.
 
@@ -89,6 +89,20 @@ flowchart LR
     API --> VPS[VPS\nTLS / firewall / backups]
 ```
 
+## Criterio transversal de diseño
+
+El diseño y la implementación de todas las interfaces propias de SIGAS deben ser **mobile-first siempre**. Cada pantalla, componente y flujo debe resolverse primero para el viewport móvil y ampliarse progresivamente para tablet y escritorio; no se aceptan diseños desktop-first adaptados posteriormente.
+
+Como mínimo:
+
+- priorizar en móvil la información, navegación y acción principal de cada tarea;
+- validar la interfaz en 320 px, 768 px, 1024 px y 1440 px;
+- evitar scroll horizontal, pérdida de información y acciones inaccesibles;
+- asegurar controles táctiles, legibilidad, foco visible y estados de carga, error y vacío;
+- registrar cualquier excepción como una decisión explícita antes de implementarla.
+
+La regla aplica al frontend propio y a toda personalización de Payload Admin que el equipo controle. La interfaz estándar de Payload Admin se utilizará sin asumir que sus componentes internos pueden rediseñarse.
+
 ### Límites de datos
 
 - MongoDB contiene usuarios, roles, grupos, membresías, productos, lotes, saldos, movimientos, recetas, entregas y auditoría.
@@ -103,7 +117,7 @@ flowchart LR
 
 | Capa | Propuesta | Estado |
 |---|---|---|
-| Backend/admin/auth | Payload CMS | Candidato |
+| Backend/admin/auth | Payload CMS | Inicializado; la decisión de stack sigue sujeta a la validación de factibilidad |
 | Base propia | MongoDB | Preferencia confirmada |
 | Operación | Frontend propio | Confirmado |
 | Padrón | Adaptador a base municipal en vivo | Confirmado conceptualmente |
@@ -112,31 +126,35 @@ flowchart LR
 
 La estrategia prevista para el login es una colección de usuarios de Payload con DNI normalizado y único, manteniendo el hash y el restablecimiento de contraseña dentro del mecanismo de autenticación. El adaptador de login debe resolver el DNI contra el usuario y reutilizar las protecciones de sesión, bloqueo y auditoría de Payload; no se implementará un almacén paralelo de contraseñas.
 
-Payload tiene adaptador oficial para MongoDB. El primer flujo ya está iniciado en `app/` con adaptador mock del padrón.
+Payload tiene adaptador oficial para MongoDB. La base técnica de Payload/Next.js ya está inicializada en la raíz del repositorio. El scaffolding actual incluye `src/payload.config.ts`, `src/app/`, `src/collections/` y `tests/`; el adaptador mock del padrón y los flujos de negocio todavía deben implementarse sobre esta base.
+
+Las variables locales necesarias (`DATABASE_URL` y `PAYLOAD_SECRET`) deben configurarse en `.env`, que no se versiona.
 
 ```bash
-cd app
-cp .env.example .env
-npm install
-npm test
-npm run dev
+pnpm install
+pnpm run dev
+pnpm run build
+pnpm run lint
+pnpm run test:int
+pnpm run test:e2e
 ```
 
-## Estructura propuesta del proyecto
+## Estructura del proyecto
 
-La estructura final depende del stack aprobado, pero debe separar responsabilidades:
+La base técnica actual vive en la raíz del repositorio. Actualmente existen `src/app/`, `src/collections/`, `src/payload.config.ts` y `tests/`. Los módulos de dominio deben crecer dentro de esta estructura, separando responsabilidades:
 
 ```text
-app/
-  backend/          Payload, servicios de dominio y adaptadores
-  frontend/         interfaz propia para operadores
-  collections/      modelos de datos propios de SIGAS
-  integrations/     adaptador del padrón municipal
-  auth/             login DNI, sesiones y permisos
-  audit/            auditoría inmutable
-  reports/          consultas y reportes operativos
-  tests/            unitarias, integración y aceptación
-  docs/             especificación y decisiones
+.
+  src/
+    app/              rutas de Payload Admin, API y frontend propio
+    collections/      modelos de datos propios de SIGAS
+    integrations/     adaptador del padrón municipal
+    auth/             login DNI, sesiones y permisos
+    audit/            auditoría inmutable
+    reports/          consultas y reportes operativos
+  tests/              unitarias, integración y aceptación
+  docs/               especificación y decisiones
+  tasks/              plan y lista de tareas
 ```
 
 El adaptador de padrón no debe filtrarse directamente en las pantallas ni en las colecciones de Mongo.
@@ -198,7 +216,7 @@ El adaptador de padrón no debe filtrarse directamente en las pantallas ni en la
 
 ## Estrategia de pruebas
 
-Antes de tener comandos definitivos, se define el alcance de pruebas:
+La estrategia de pruebas se ejecuta con los comandos actuales del proyecto y debe cubrir el comportamiento funcional, la seguridad y la adaptación responsive de las interfaces propias:
 
 ### Unitarias
 
@@ -228,7 +246,8 @@ Antes de tener comandos definitivos, se define el alcance de pruebas:
 - entrega individual autorizada;
 - tercero receptor;
 - reportes de stock y entregas;
-- acceso administrativo completo y auditado.
+- acceso administrativo completo y auditado;
+- pantallas propias verificadas en 320 px, 768 px, 1024 px y 1440 px sin scroll horizontal ni pérdida de acciones.
 
 ### Seguridad
 
@@ -238,7 +257,7 @@ Antes de tener comandos definitivos, se define el alcance de pruebas:
 - las contraseñas y secretos no aparecen en logs;
 - no se puede borrar la auditoría desde la aplicación.
 
-Los comandos actuales están en `app/package.json`: `npm run dev`, `npm test`, `npm run build` y `npm run lint`.
+Los comandos actuales están en `package.json`: `pnpm run dev`, `pnpm test`, `pnpm run build`, `pnpm run lint`, `pnpm run test:int` y `pnpm run test:e2e`.
 
 ## Límites de trabajo
 
@@ -249,6 +268,7 @@ Los comandos actuales están en `app/package.json`: `npm run dev`, `npm test`, `
 - usar referencias estables para contribuyentes;
 - conservar historial y bajas lógicas;
 - probar invariantes de stock y entregas;
+- diseñar y validar todas las interfaces propias con enfoque mobile-first siempre;
 - mantener la documentación actualizada cuando cambie una decisión.
 
 ### Consultar antes
