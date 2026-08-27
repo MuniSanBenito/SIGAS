@@ -1,20 +1,11 @@
-import { test, expect, Page } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 
-test.describe('Frontend', () => {
-  let page: Page
+test('can go on homepage', async ({ page }) => {
+  await page.goto('http://localhost:3000')
 
-  test.beforeAll(async ({ browser }, testInfo) => {
-    const context = await browser.newContext()
-    page = await context.newPage()
-  })
+  await expect(page).toHaveTitle(/Payload Blank Template/)
 
-  test('can go on homepage', async ({ page }) => {
-    await page.goto('http://localhost:3000')
+  const heading = page.locator('h1').first()
 
-    await expect(page).toHaveTitle(/Payload Blank Template/)
-
-    const heading = page.locator('h1').first()
-
-    await expect(heading).toHaveText('Welcome to your new project.')
-  })
+  await expect(heading).toHaveText('Welcome to your new project.')
 })

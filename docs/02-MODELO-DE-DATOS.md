@@ -23,7 +23,7 @@
 
 ## Operaciones contra el padrón
 
-SIGAS no guarda una copia local del contribuyente. Cada alta o actualización se ejecuta contra la base municipal mediante el adaptador y debe registrar en Mongo un resultado técnico de integración, sin convertirse en una fuente alternativa:
+SIGAS no guarda una copia local del contribuyente. Cada alta o actualización se ejecuta contra la base municipal mediante el adaptador y debe registrar en Mongo un resultado técnico de integración, sin convertirse en una fuente alternativa. El ciclo comienza en `solicitada` y termina en un estado final:
 
 - `solicitada`: operación iniciada;
 - `confirmada`: la base municipal confirmó el cambio;
@@ -118,7 +118,7 @@ Documento de autenticación y autorización administrado por Payload/Mongo.
 Campos conceptuales:
 
 - `id`;
-- `dni_login` único y normalizado;
+- `dni_login` único y normalizado: sin puntos, espacios ni guiones, solo dígitos y conservando ceros iniciales;
 - `nombre`;
 - `activo`;
 - `requiere_cambio_password`;

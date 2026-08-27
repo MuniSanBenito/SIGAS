@@ -28,6 +28,8 @@ Supuestos adoptados:
 | Resultado de integración | `solicitada`, `confirmada`, `rechazada` o `incierta`. |
 | Operación incierta | No se reintenta automáticamente sin idempotencia o verificación posterior. |
 
+`solicitada` representa el inicio de la operación. El adaptador conserva la secuencia hasta un estado terminal (`confirmada`, `rechazada` o `incierta`); el mock devuelve el estado terminal junto con el historial del ciclo.
+
 ## Datos técnicos a relevar con Infraestructura
 
 ### Motor y conexión

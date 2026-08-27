@@ -110,7 +110,7 @@ La regla aplica al frontend propio y a toda personalización de Payload Admin qu
 - SIGAS no mantiene una copia local de contribuyentes en Mongo. Las altas y actualizaciones se escriben en la base municipal mediante el adaptador; una operación exitosa no crea un documento paralelo.
 - La referencia técnica debe usar un ID municipal inmutable: un identificador único que no cambie al corregir DNI, nombre o domicilio. Si no existe, se debe aprobar una estrategia alternativa antes de crear referencias en Mongo.
 - El adaptador de padrón debe aislar el esquema externo y aplicar validación, permisos mínimos, timeout, reintentos acotados, idempotencia y auditoría.
-- Los resultados del adaptador son `confirmada`, `rechazada` o `incierta`. Una operación incierta no se reintenta sin idempotencia o verificación posterior.
+- El ciclo de integración contempla `solicitada` como estado inicial y `confirmada`, `rechazada` o `incierta` como estados finales. Una operación incierta no se reintenta sin idempotencia o verificación posterior.
 - No se asume una transacción distribuida entre Mongo y la base municipal. La estrategia de fallos, compensación y resultados inciertos debe estar definida antes del código.
 
 ### Stack provisional
@@ -124,7 +124,7 @@ La regla aplica al frontend propio y a toda personalización de Payload Admin qu
 | Hosting | VPS | Destino confirmado; proveedor y conectividad pendientes |
 | Login | DNI + contraseña | Confirmado; requiere estrategia de login personalizada |
 
-La estrategia prevista para el login es una colección de usuarios de Payload con DNI normalizado y único, manteniendo el hash y el restablecimiento de contraseña dentro del mecanismo de autenticación. El adaptador de login debe resolver el DNI contra el usuario y reutilizar las protecciones de sesión, bloqueo y auditoría de Payload; no se implementará un almacén paralelo de contraseñas.
+La estrategia prevista para el login es una colección de usuarios de Payload con DNI normalizado y único, manteniendo el hash y el restablecimiento de contraseña dentro del mecanismo de autenticación. El DNI de username se normaliza eliminando puntos, espacios y guiones, aceptando únicamente dígitos y conservando los ceros iniciales. El adaptador de login debe resolver el DNI contra el usuario y reutilizar las protecciones de sesión, bloqueo y auditoría de Payload; no se implementará un almacén paralelo de contraseñas.
 
 Payload tiene adaptador oficial para MongoDB. La base técnica de Payload/Next.js ya está inicializada en la raíz del repositorio. El scaffolding actual incluye `src/payload.config.ts`, `src/app/`, `src/collections/` y `tests/`; el adaptador mock del padrón y los flujos de negocio todavía deben implementarse sobre esta base.
 
