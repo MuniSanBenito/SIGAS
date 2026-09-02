@@ -1,0 +1,254 @@
+@import 'tailwindcss';
+
+@plugin "daisyui" {
+  themes:
+    sanbenito-light --default,
+    sanbenito-dark --prefersdark;
+  exclude: calendar;
+}
+
+@plugin "daisyui/theme" {
+  name: 'sanbenito-light';
+  default: true;
+  prefersdark: false;
+  color-scheme: light;
+  --color-base-100: #ffffff;
+  --color-base-200: #f3f7f4;
+  --color-base-300: #e1ebe4;
+  --color-base-content: #14261d;
+  --color-primary: #076633;
+  --color-primary-content: #ffffff;
+  --color-secondary: #b6c544;
+  --color-secondary-content: #1b281b;
+  --color-accent: #7bcbe2;
+  --color-accent-content: #12313a;
+  --color-neutral: #183d2a;
+  --color-neutral-content: #f4faf5;
+  --color-info: #0b6894;
+  --color-info-content: #ffffff;
+  --color-success: #1f7a4d;
+  --color-success-content: #ffffff;
+  --color-warning: #9a5b00;
+  --color-warning-content: #ffffff;
+  --color-error: #b42318;
+  --color-error-content: #ffffff;
+  --radius-selector: 0.25rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+@plugin "daisyui/theme" {
+  name: 'sanbenito-dark';
+  default: false;
+  prefersdark: true;
+  color-scheme: dark;
+  --color-base-100: #0f1a13;
+  --color-base-200: #14231a;
+  --color-base-300: #1c3023;
+  --color-base-content: #e5efe8;
+  --color-primary: #a7b844;
+  --color-primary-content: #172312;
+  --color-secondary: #f3cc21;
+  --color-secondary-content: #2a250a;
+  --color-accent: #8bd3e3;
+  --color-accent-content: #123039;
+  --color-neutral: #223a2a;
+  --color-neutral-content: #e7f1e9;
+  --color-info: #72c5e5;
+  --color-info-content: #0d2b38;
+  --color-success: #80c997;
+  --color-success-content: #102d1e;
+  --color-warning: #e8bd55;
+  --color-warning-content: #3b2a08;
+  --color-error: #f28a7d;
+  --color-error-content: #3e0d0b;
+  --radius-selector: 0.25rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.5rem;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+@theme {
+  --color-brand-green-50: #f2f8f4;
+  --color-brand-green-100: #e2f1e7;
+  --color-brand-green-200: #c6e2d0;
+  --color-brand-green-300: #9fc9b0;
+  --color-brand-green-400: #70ab8b;
+  --color-brand-green-500: #438d68;
+  --color-brand-green-600: #1e754d;
+  --color-brand-green-700: #076633;
+  --color-brand-green-800: #055528;
+  --color-brand-green-900: #064522;
+  --color-brand-green-950: #032c15;
+  --color-brand-lime-50: #fbfcea;
+  --color-brand-lime-100: #f4f7c7;
+  --color-brand-lime-200: #e9efa0;
+  --color-brand-lime-300: #d9e27a;
+  --color-brand-lime-400: #c7d45a;
+  --color-brand-lime-500: #b6c544;
+  --color-brand-lime-600: #99aa32;
+  --color-brand-lime-700: #778627;
+  --color-brand-lime-800: #59651e;
+  --color-brand-lime-900: #3e4718;
+  --color-brand-lime-950: #282e10;
+  --color-brand-sky-50: #f1fbfd;
+  --color-brand-sky-100: #dff5f9;
+  --color-brand-sky-200: #c2eaf1;
+  --color-brand-sky-300: #9bdde8;
+  --color-brand-sky-400: #7bcbe2;
+  --color-brand-sky-500: #4bb2cf;
+  --color-brand-sky-600: #2897b4;
+  --color-brand-sky-700: #1d788f;
+  --color-brand-sky-800: #185f70;
+  --color-brand-sky-900: #164f5d;
+  --color-brand-sky-950: #0b303a;
+  --color-brand-neutral-50: #f7faf8;
+  --color-brand-neutral-100: #eef4ef;
+  --color-brand-neutral-200: #e0e9e2;
+  --color-brand-neutral-300: #c9d6cc;
+  --color-brand-neutral-400: #aabdaf;
+  --color-brand-neutral-500: #899f8e;
+  --color-brand-neutral-600: #687e6d;
+  --color-brand-neutral-700: #4b6251;
+  --color-brand-neutral-800: #304637;
+  --color-brand-neutral-900: #1e3024;
+  --color-brand-neutral-950: #111d16;
+}
+
+@theme inline {
+  --color-page: var(--c-page);
+  --color-sidebar: var(--c-sidebar);
+  --color-surface: var(--c-card);
+  --color-surface-alt: var(--c-card-alt);
+  --color-surface-hover: var(--c-card-hover);
+  --color-content: var(--c-text-1);
+  --color-content-muted: var(--c-text-2);
+  --color-line: var(--c-border);
+  --color-focus: var(--c-focus);
+}
+
+@custom-variant dark (&:where([data-theme=sanbenito-dark], [data-theme=sanbenito-dark] *));
+
+:root {
+  --font-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
+  --c-page: var(--color-base-200);
+  --c-sidebar: var(--color-neutral);
+  --c-header-strip: var(--color-primary);
+  --c-card: var(--color-base-100);
+  --c-card-alt: var(--color-base-200);
+  --c-card-hover: var(--color-base-300);
+  --c-modal: var(--color-base-100);
+  --c-drawer: var(--color-base-100);
+  --c-input: var(--color-base-100);
+  --c-input-border: color-mix(in srgb, var(--color-base-content) 24%, transparent);
+  --c-border: color-mix(in srgb, var(--color-base-content) 16%, transparent);
+  --c-border-subtle: color-mix(in srgb, var(--color-base-content) 9%, transparent);
+  --c-text-1: var(--color-base-content);
+  --c-text-2: color-mix(in srgb, var(--color-base-content) 76%, var(--color-base-100));
+  --c-text-3: color-mix(in srgb, var(--color-base-content) 70%, var(--color-base-100));
+  --c-text-4: color-mix(in srgb, var(--color-base-content) 65%, var(--color-base-100));
+  --c-sidebar-text: var(--color-neutral-content);
+  --c-sidebar-muted: color-mix(in srgb, var(--color-neutral-content) 66%, transparent);
+  --c-sidebar-border: color-mix(in srgb, var(--color-neutral-content) 15%, transparent);
+  --c-nav-hover: color-mix(in srgb, var(--color-neutral-content) 10%, transparent);
+  --c-nav-active: color-mix(in srgb, var(--color-primary) 22%, transparent);
+  --c-nav-active-text: var(--color-primary);
+  --c-nav-active-border: var(--color-secondary);
+  --c-avatar-bg: var(--color-secondary);
+  --c-avatar-text: var(--color-secondary-content);
+  --c-select-bg: var(--color-base-100);
+  --c-select-text: var(--color-base-content);
+  --c-table-header: var(--color-base-200);
+  --c-table-border: var(--c-border);
+  --c-table-hover: var(--color-base-200);
+  --c-focus: var(--color-primary);
+  --c-focus-ring: var(--color-primary);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--c-page);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+html[data-theme='sanbenito-dark'] {
+  color-scheme: dark;
+}
+
+body {
+  min-height: 100%;
+  margin: 0;
+  background: var(--c-page);
+  color: var(--c-text-1);
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+svg {
+  vertical-align: middle;
+}
+
+a {
+  color: inherit;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid var(--c-focus);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--color-secondary);
+  color: var(--color-secondary-content);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
