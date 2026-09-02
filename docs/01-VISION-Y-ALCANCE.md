@@ -26,9 +26,9 @@ La Dirección necesita reemplazar planillas separadas y poder responder con conf
 
 El MVP se considera útil cuando:
 
-- Depósito puede consultar un saldo confiable por producto.
-- Depósito puede registrar entradas, salidas, ajustes y entregas con auditoría.
-- Gestión de grupos puede crear grupos desde el padrón municipal.
+- Control de stock puede consultar un saldo confiable por producto.
+- Control de stock puede registrar entradas, salidas y ajustes con auditoría.
+- Administración puede crear grupos desde el padrón municipal.
 - Una entrega puede apuntar a un grupo o a una persona y conservar su detalle real.
 - El historial de entregas se puede consultar por destinatario y período.
 - Los reportes básicos de stock y entregas reemplazan el circuito operativo de planillas.
@@ -80,8 +80,8 @@ El MVP se considera útil cuando:
 | Perfil | Responsabilidad principal |
 |---|---|
 | **Administrador** | Gestiona usuarios, roles, permisos y todos los datos desde Payload Admin. Su acceso es completo y auditado. |
-| **Gestión de grupos** | Consulta y actualiza contribuyentes; crea y mantiene grupos, referentes, integrantes y parentescos. Consulta historial de entregas, sin modificar stock ni entregas. |
-| **Depósito/Stock** | Gestiona productos, recetas, entradas, salidas y confirma entregas. Consulta grupos y puede corregir datos de contribuyentes, pero no modifica la composición de grupos. |
+| **Administración** | Consulta y actualiza contribuyentes; crea y mantiene grupos, referentes, integrantes y parentescos. No modifica stock ni entregas. |
+| **Control de stock** | Gestiona productos, recetas, entradas, salidas y ajustes del depósito. No crea ni edita contribuyentes, grupos ni membresías. |
 
 Las áreas de intervención y Dirección/Supervisión se incorporarán como usuarios operativos en fases posteriores.
 

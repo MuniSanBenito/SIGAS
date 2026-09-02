@@ -2,16 +2,34 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 
-import { IconHome, IconLogout, IconMenu2, IconX } from '@tabler/icons-react'
+import { IconHome, IconLogout, IconMenu2, IconPackages, IconUsers, IconX } from '@tabler/icons-react'
+
+import { canAccessModule, type ModuleKey, type Role } from '@/access/roles'
 
 import { Brand } from './brand'
 import { ThemeToggle } from './theme-toggle'
 
-type DashboardShellProps = { children: ReactNode }
+type DashboardShellProps = {
+  children: ReactNode
+  roles?: readonly Role[] | null
+}
 
-export function DashboardShell({ children }: DashboardShellProps) {
+type NavigationItem = {
+  href: string
+  icon: (props: { 'aria-hidden'?: boolean | 'true' | 'false'; className?: string; stroke?: number }) => ReactNode
+  label: string
+  module?: ModuleKey
+}
+
+const navigationItems: NavigationItem[] = [
+  { href: '/', icon: IconHome, label: 'Inicio' },
+  { href: '/grupos', icon: IconUsers, label: 'Grupos familiares', module: 'groups' },
+  { href: '/inventario', icon: IconPackages, label: 'Inventario', module: 'inventory' },
+]
+
+export function DashboardShell({ children, roles }: DashboardShellProps) {
   const router = useRouter()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
@@ -77,7 +95,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
     <div className="min-h-screen overflow-x-hidden bg-page text-content lg:grid lg:grid-cols-[17rem_minmax(0,1fr)]">
       <aside aria-label="Navegación principal" className="hidden min-h-screen flex-col border-r border-[var(--c-sidebar-border)] bg-sidebar text-[var(--c-sidebar-text)] lg:flex">
         <SidebarHeader />
-        <nav aria-label="Secciones del sistema" className="flex-1 px-4 py-6"><NavigationLink active /></nav>
+        <nav aria-label="Secciones del sistema" className="flex-1 px-4 py-6"><Navigation roles={roles} /></nav>
         <div className="border-t border-[var(--c-sidebar-border)] p-4">
           <div className="mb-2 flex justify-end"><ThemeToggle /></div>
           <LogoutButton isLoggingOut={isLoggingOut} onClick={handleLogout} />
@@ -105,7 +123,7 @@ export function DashboardShell({ children }: DashboardShellProps) {
                   <IconX aria-hidden="true" className="h-5 w-5" stroke={1.8} />
                 </button>
               </div>
-              <nav aria-label="Secciones del sistema" className="flex-1 px-4 py-6"><NavigationLink active onClick={closeMenu} /></nav>
+              <nav aria-label="Secciones del sistema" className="flex-1 px-4 py-6"><Navigation onClick={closeMenu} roles={roles} /></nav>
               <div className="border-t border-[var(--c-sidebar-border)] p-4"><LogoutButton isLoggingOut={isLoggingOut} onClick={handleLogout} /></div>
             </aside>
           </div>
@@ -122,8 +140,21 @@ function SidebarHeader({ compact = false }: { compact?: boolean }) {
   return <div className={`${compact ? 'px-1' : 'px-5 py-6'} text-[var(--c-sidebar-text)]`}><Brand /></div>
 }
 
-function NavigationLink({ active = false, onClick }: { active?: boolean; onClick?: () => void }) {
-  return <Link aria-current={active ? 'page' : undefined} className={`flex min-h-11 items-center gap-3 rounded-box px-4 py-3 text-sm font-semibold transition-colors ${active ? 'border-l-2 border-[var(--c-nav-active-border)] bg-[var(--c-nav-active)] text-[var(--c-sidebar-text)]' : 'text-[var(--c-sidebar-muted)] hover:bg-[var(--c-nav-hover)] hover:text-[var(--c-sidebar-text)]'}`} href="/" onClick={onClick}><IconHome aria-hidden="true" className="h-5 w-5" stroke={1.8} />Inicio</Link>
+function Navigation({ onClick, roles }: { onClick?: () => void; roles?: readonly Role[] | null }) {
+  const pathname = usePathname()
+  const user = { roles }
+
+  return (
+    <div className="space-y-1">
+      {navigationItems
+        .filter(({ module }) => !module || canAccessModule(user, module))
+        .map(({ href, icon: Icon, label }) => {
+          const active = href === '/' ? pathname === '/' : pathname?.startsWith(href)
+
+          return <Link aria-current={active ? 'page' : undefined} className={`flex min-h-11 items-center gap-3 rounded-box px-4 py-3 text-sm font-semibold transition-colors ${active ? 'border-l-2 border-[var(--c-nav-active-border)] bg-[var(--c-nav-active)] text-[var(--c-sidebar-text)]' : 'text-[var(--c-sidebar-muted)] hover:bg-[var(--c-nav-hover)] hover:text-[var(--c-sidebar-text)]'}`} href={href} key={href} onClick={onClick}><Icon aria-hidden="true" className="h-5 w-5" stroke={1.8} />{label}</Link>
+        })}
+    </div>
+  )
 }
 
 function LogoutButton({ isLoggingOut, onClick }: { isLoggingOut: boolean; onClick: () => void }) {

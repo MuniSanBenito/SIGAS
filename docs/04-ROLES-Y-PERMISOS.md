@@ -14,16 +14,22 @@ Un usuario puede tener un rol transversal sin pertenecer a un área de intervenc
 | Rol | Responsabilidad |
 |---|---|
 | **Administrador** | Acceso completo a usuarios, permisos, padrón, grupos, stock, entregas, auditoría e intervenciones. Puede operar desde Payload Admin. Todo acceso sensible queda auditado. |
-| **Depósito/Stock** | Gestiona productos, lotes, recetas, entradas, salidas y confirmación de entregas. Consulta grupos. Puede corregir cualquier campo de contribuyente, con auditoría, pero no modifica miembros, referentes ni estructura de grupos. |
-| **Gestión de grupos** | Consulta y actualiza contribuyentes. Crea y mantiene grupos, referentes, integrantes y parentescos. Consulta historial de entregas, pero no crea, edita, corrige ni anula entregas ni stock. |
+| **Control de stock** | Gestiona productos, lotes, recetas, entradas, salidas y ajustes del depósito. No crea ni edita contribuyentes, grupos ni membresías. |
+| **Administración** | Consulta y actualiza contribuyentes. Crea y mantiene grupos, referentes, integrantes y parentescos. No modifica stock ni entregas. |
 | **Operador de Área** — futuro | Carga y consulta intervenciones propias del área asignada. Ve el semáforo resumido de otras áreas. |
 | **Jefe de Área** — futuro | Administra las intervenciones propias de su área y reportes de equipo. |
 | **Dirección/Supervisión** — futuro | Consulta coordinación y reportes. El acceso a detalle se define por área; el Administrador mantiene acceso completo. |
 | **Consulta general** — opcional futuro | Consulta básica sin acceso a intervenciones, stock ni datos sensibles. |
 
+## Asignación de roles en la primera implementación
+
+Los roles iniciales se almacenan en un campo múltiple del usuario. Un usuario puede tener uno o más roles y recibe la unión de sus permisos. El Administrador los asigna y modifica desde Payload Admin; los usuarios operativos no pueden modificar sus propios roles.
+
+Los valores iniciales son `admin`, `stock` y `administracion`. `admin` es el único rol habilitado para Payload Admin. El Administrador se protege como capacidad especial: no puede eliminarse ni quedar sin reemplazo.
+
 ## Roles y permisos configurables
 
-El Administrador puede crear roles y permisos por módulo y acción. Deben existir controles de seguridad:
+La evolución prevista permite que el Administrador cree roles y permisos por módulo y acción. Deben existir controles de seguridad:
 
 - proteger una capacidad de **superadministrador**;
 - impedir eliminar o desactivar al último Administrador;
@@ -36,31 +42,33 @@ El Administrador puede crear roles y permisos por módulo y acción. Deben exist
 
 Convenciones: **V** = ver, **C** = crear/confirmar, **E** = editar/corregir, **B** = baja lógica, **–** = sin acceso.
 
-| Módulo/acción | Administrador | Depósito/Stock | Gestión de grupos |
+| Módulo/acción | Administrador | Control de stock | Administración |
 |---|---:|---:|---:|
 | Usuarios, roles y permisos | V/C/E/B | – | – |
 | Login y recuperación administrativa | V/C/E/B | V propia | V propia |
-| Consulta de contribuyentes | V | V | V |
-| Crear/editar contribuyentes | C/E/B | E | C/E/B |
-| Crear/editar grupos y membresías | C/E/B | V | C/E/B |
-| Cambiar referente | C/E/B | V | C/E/B |
-| Historial de entregas | V | V | V |
+| Consulta de contribuyentes | V | – | V |
+| Crear/editar contribuyentes | C/E/B | – | C/E/B |
+| Crear/editar grupos y membresías | C/E/B | – | C/E/B |
+| Cambiar referente | C/E/B | – | C/E/B |
+| Historial de entregas | V | – | – |
 | Productos y categorías | V/C/E/B | C/E/B | – |
 | Lotes/vencimientos | V/C/E/B | C/E/B | – |
 | Entradas de stock | V/C/E/B | C/E/B | – |
 | Salidas por pérdida/vencimiento/ajuste | V/C/E/B | C/E/B | – |
 | Recetas y versiones de bolsones | V/C/E/B | C/E/B | – |
-| Confirmar entregas | V/C/E/B | C | – |
-| Anular entregas confirmadas | V/C | C | – |
+| Confirmar entregas | V/C/E/B | – | – |
+| Anular entregas confirmadas | V/C | – | – |
 | Reportes de stock | V | V | – |
-| Reportes de entregas | V | V | V (historial operativo) |
+| Reportes de entregas | V | – | – |
 | Auditoría | V | – | – |
 
-Una entrega confirmada no se edita ni se borra. Depósito o Administrador la anulan con motivo y crean una nueva. Ante faltante, Depósito ajusta las líneas reales y confirma solo lo disponible.
+En esta primera implementación solo se habilitan rutas y navegación para grupos familiares e inventario; las tarjetas informativas de Entregas y Reportes quedan visibles únicamente para el Administrador hasta construir sus pantallas y rutas.
+
+Una entrega confirmada no se edita ni se borra. El Administrador la anula con motivo y crea una nueva. Ante faltante, el proceso autorizado ajusta las líneas reales y confirma solo lo disponible.
 
 ## Permisos de contribuyentes
 
-Por decisión del proyecto, cualquier operador habilitado puede editar todos los campos del contribuyente, incluyendo identidad y contacto. Esta capacidad es de alto riesgo y exige:
+Administración y Administrador pueden editar todos los campos del contribuyente, incluyendo identidad y contacto. Esta capacidad es de alto riesgo y exige:
 
 - DNI normalizado y validación de duplicados;
 - identificador municipal estable para referencias internas, si existe;
@@ -72,8 +80,8 @@ Por decisión del proyecto, cualquier operador habilitado puede editar todos los
 
 ## Entregas y receptores
 
-- Solo Depósito y Administrador pueden confirmar una entrega.
-- Gestión de grupos puede ver el historial, pero no modificarlo.
+- Solo el Administrador puede confirmar o anular una entrega en esta primera matriz de roles.
+- Administración y Control de stock no acceden al historial de entregas desde sus módulos.
 - El destino puede ser un grupo o una persona.
 - Una entrega individual sin grupo requiere autorización y motivo.
 - Un retiro grupal corresponde a un integrante/referente o a un tercero que sea contribuyente y esté autorizado.

@@ -13,7 +13,7 @@ Estas reglas desbloquean inventario y entregas. Si Depósito las cambia, se actu
 
 **Regla adoptada:** se ajusta el contenido y se entrega solo lo disponible. El operador confirma las líneas reales. No se permite saldo negativo. No se reserva stock. No se genera automáticamente una segunda entrega.
 
-- Autorización de excepción: no aplica para faltante parcial; el operador de Depósito decide el contenido real.
+- Autorización de excepción: no aplica para faltante parcial; el Administrador decide el contenido real.
 - Motivo obligatorio: sí, cuando la entrega difiere de la receta.
 - Se informa al destinatario: mediante observación de la entrega.
 - Reservar stock: no en el MVP.
@@ -22,7 +22,7 @@ Estas reglas desbloquean inventario y entregas. Si Depósito las cambia, se actu
 
 **Regla adoptada:** se anula la entrega y se crea una nueva. La anulación genera movimientos compensatorios. Nunca se borra la entrega original.
 
-- Quién puede anular: Administrador y Depósito.
+- Quién puede anular: Administrador.
 - Motivo: obligatorio.
 - Destinatario/contenido/fecha: se corrigen creando una entrega nueva, no editando la original.
 - Reversión de stock: movimiento de compensación por cada línea real anulada.

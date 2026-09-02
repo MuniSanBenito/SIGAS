@@ -15,8 +15,8 @@ Construir un sistema interno para la Dirección de Acción Social que permita cr
 ### Usuarios iniciales
 
 - **Administrador:** acceso total desde Payload Admin, incluyendo usuarios, permisos, contribuyentes, grupos, stock, entregas y auditoría.
-- **Gestión de grupos:** administra grupos, integrantes, referentes y parentescos; consulta historial de entregas.
-- **Depósito/Stock:** administra inventario, recetas y entregas; consulta grupos y puede corregir contribuyentes.
+- **Administración:** administra contribuyentes, grupos, integrantes, referentes y parentescos; no modifica stock ni entregas.
+- **Control de stock:** administra inventario, recetas, entradas, salidas y ajustes; no modifica contribuyentes ni grupos.
 
 Área y rol son dimensiones independientes. Las áreas de intervención se incorporan en fases posteriores.
 
@@ -26,10 +26,10 @@ El MVP funciona cuando:
 
 1. un usuario puede ingresar con DNI y contraseña;
 2. un operador puede consultar el padrón municipal en vivo;
-3. Gestión de grupos puede crear un grupo con referente e integrantes;
-4. Depósito puede cargar productos y entradas de compra/donación;
-5. Depósito puede definir una receta y crear nuevas versiones;
-6. Depósito puede confirmar una entrega mixta a un grupo o persona;
+3. Administración puede crear un grupo con referente e integrantes;
+4. Control de stock puede cargar productos y entradas de compra/donación;
+5. Control de stock puede definir una receta y crear nuevas versiones;
+6. el Administrador puede confirmar una entrega mixta a un grupo o persona;
 7. el stock se descuenta por las líneas reales entregadas;
 8. el historial permite consultar qué se entregó, cuándo, a quién y quién confirmó;
 9. los reportes muestran stock actual, mínimos, vencimientos y entregas;
@@ -197,7 +197,7 @@ El adaptador de padrón no debe filtrarse directamente en las pantallas ni en la
 
 **Reglas:**
 
-- cualquier operador habilitado puede corregir todos los campos;
+- Administración y Administrador pueden corregir todos los campos;
 - se valida DNI/CUIT y duplicados;
 - se escribe mediante el adaptador del padrón;
 - se conserva antes/después, actor y timestamp;
@@ -212,7 +212,7 @@ El adaptador de padrón no debe filtrarse directamente en las pantallas ni en la
 - **Disponibilidad:** definir qué funciones quedan bloqueadas si el padrón no responde.
 - **Recuperación:** backups automáticos del VPS/Mongo y pruebas periódicas de restauración.
 - **Privacidad:** acceso a datos sensibles auditado; el Administrador tiene acceso completo por decisión del proyecto.
-- **Usabilidad:** operaciones de Depósito y Gestión de grupos deben estar guiadas por pantallas propias, no por edición directa de documentos crudos.
+- **Usabilidad:** operaciones de Control de stock y Administración deben estar guiadas por pantallas propias, no por edición directa de documentos crudos.
 
 ## Estrategia de pruebas
 
@@ -252,7 +252,7 @@ La estrategia de pruebas se ejecuta con los comandos actuales del proyecto y deb
 ### Seguridad
 
 - usuario sin permiso no puede ejecutar la acción por API aunque oculte el botón;
-- un operador no puede modificar membresías si solo tiene permiso de Depósito;
+- un operador no puede modificar membresías si solo tiene permiso de Control de stock;
 - un tercero no contribuyente no puede ser receptor;
 - las contraseñas y secretos no aparecen en logs;
 - no se puede borrar la auditoría desde la aplicación.
@@ -305,14 +305,14 @@ Siguen pendientes para producción, no para el primer flujo:
 
 - evidencia sanitizada del padrón real;
 - backups, recuperación y retención institucionales;
-- validación formal de Depósito/Dirección/Infraestructura.
+- validación formal de Control de stock/Dirección/Infraestructura.
 
 ## Aprobación
 
 La especificación queda lista para revisión cuando:
 
 - la Dirección confirme el alcance y perfiles;
-- Depósito confirme las reglas de faltantes y correcciones;
+- Control de stock confirme las reglas de faltantes y correcciones;
 - Infraestructura confirme motor, ID, permisos, conectividad y backups;
 - se apruebe Payload/Mongo o se documente una alternativa;
 - se aprueben los criterios de aceptación;

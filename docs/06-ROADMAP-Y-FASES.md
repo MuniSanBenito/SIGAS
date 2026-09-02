@@ -83,7 +83,7 @@ Incluye:
 - historial por destinatario;
 - regla de stock insuficiente aprobada.
 
-**Checkpoint:** una entrega mixta confirmada genera exactamente las salidas reales y queda visible para Depósito y Gestión de grupos según permisos.
+**Checkpoint:** una entrega mixta confirmada genera exactamente las salidas reales y queda visible para los roles autorizados según permisos.
 
 ## Fase 5 — Reportes, auditoría y endurecimiento
 

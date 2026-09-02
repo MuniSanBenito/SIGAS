@@ -16,5 +16,5 @@ export default async function HomePage() {
     redirect('/login')
   }
 
-  return <DashboardHome />
+  return <DashboardHome roles={user.roles} />
 }

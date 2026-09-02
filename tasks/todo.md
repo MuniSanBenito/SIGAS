@@ -27,7 +27,7 @@
   - Dependencies: Gate 0.
 
 - [x] **1.2 Authentication and authorization**
-  - Acceptance: Users login with DNI as username; roles admin/deposito/gestion_grupos exist; admin-only Payload Admin.
+  - Acceptance: Users login with DNI as username; roles admin/stock/administracion exist; admin-only Payload Admin.
   - Verify: Users collection configured with official `loginWithUsername`.
   - Dependencies: 1.1.
 

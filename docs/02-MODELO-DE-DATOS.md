@@ -16,7 +16,7 @@
 | Contribuyentes | Base municipal | Consulta y alta/actualización mediante adaptador en vivo |
 | Usuarios, autenticación y permisos | MongoDB/Payload | Administración interna |
 | Grupos y membresías | MongoDB/SIGAS | Creación y mantenimiento manual |
-| Productos, lotes y stock | MongoDB/SIGAS | Operación de Depósito |
+| Productos, lotes y stock | MongoDB/SIGAS | Operación de Control de stock |
 | Recetas y versiones de bolsones | MongoDB/SIGAS | Planificación y trazabilidad |
 | Entregas y detalles reales | MongoDB/SIGAS | Historial y reportes |
 | Auditoría | MongoDB/SIGAS, con protección de escritura | Trazabilidad de todas las acciones sensibles |
@@ -131,7 +131,7 @@ La contraseña la gestiona el mecanismo de autenticación; nunca se guarda en te
 ### `AREA`, `ROL` y `PERMISO`
 
 - `AREA` representa una pertenencia funcional de intervención.
-- `ROL` representa una función del sistema, por ejemplo Administrador, Depósito o Gestión de grupos.
+- `ROL` representa una función del sistema, por ejemplo Administrador, Control de stock o Administración.
 - `PERMISO` representa una acción sobre un módulo, por ejemplo `entregas.confirmar` o `stock.ajustar`.
 
 Área y rol son dimensiones independientes. Un usuario transversal puede no pertenecer a un área de intervención.
@@ -191,7 +191,7 @@ Solo se usa cuando el producto está configurado para control de lote/vencimient
 - estado;
 - timestamps.
 
-En una entrega, Depósito selecciona manualmente el lote cuando corresponde.
+En una entrega, el Administrador selecciona manualmente el lote cuando corresponde.
 
 ### `STOCK_SALDO`
 

@@ -5,7 +5,7 @@
 - **Padrón municipal:** fuente externa de contribuyentes, consultada en vivo.
 - **Mongo SIGAS:** datos propios de grupos, stock, entregas, usuarios y auditoría.
 - **Confirmar:** acción que deja un registro efectivo y, en entregas, descuenta stock.
-- **Pendiente:** regla que requiere decisión de Depósito, Dirección o Infraestructura y no debe resolverse por supuesto técnico.
+- **Pendiente:** regla que requiere decisión de Control de stock, Dirección o Infraestructura y no debe resolverse por supuesto técnico.
 
 ## Flujo 0 — Inicio de sesión
 
@@ -40,7 +40,7 @@ Si el padrón no está disponible se bloquean las operaciones que dependen de co
 
 ```mermaid
 flowchart TD
-    A[Gestión de grupos busca contribuyente] --> B[Selecciona referente]
+    A[Administración busca contribuyente] --> B[Selecciona referente]
     B --> C[Crea grupo activo]
     C --> D[Agrega integrantes con parentesco]
     D --> E{Integrante ya está en otro grupo activo?}
@@ -57,7 +57,7 @@ El grupo no guarda domicilio propio en el MVP. La ubicación operativa se obtien
 
 ```mermaid
 flowchart TD
-    A[Depósito recibe mercadería] --> B[Selecciona producto]
+    A[Control de stock recibe mercadería] --> B[Selecciona producto]
     B --> C{Producto controla lote/vencimiento?}
     C -- Sí --> D[Carga lote y fecha de vencimiento]
     C -- No --> E[Continúa sin lote]
@@ -72,7 +72,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[Depósito crea o selecciona tipo de bolsón] --> B[Incorpora productos y cantidades enteras]
+    A[Control de stock crea o selecciona tipo de bolsón] --> B[Incorpora productos y cantidades enteras]
     B --> C{El tipo ya tiene entregas históricas?}
     C -- No --> D[Guarda primera versión]
     C -- Sí --> E[Crea nueva versión sin alterar anteriores]
@@ -85,7 +85,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[Depósito busca grupo o persona] --> B[Consulta historial de entregas]
+    A[Administrador busca grupo o persona] --> B[Consulta historial de entregas]
     B --> C[Indica destino y área opcional]
     C --> D[Selecciona receptor físico]
     D --> E{Es integrante/referente?}
@@ -110,7 +110,7 @@ Una fecha futura sigue descontando stock al confirmar; se conserva por separado 
 
 ```mermaid
 flowchart TD
-    A[Depósito detecta vencimiento, pérdida, rotura o diferencia] --> B[Selecciona producto/lote]
+    A[Control de stock detecta vencimiento, pérdida, rotura o diferencia] --> B[Selecciona producto/lote]
     B --> C[Indica cantidad y motivo obligatorio]
     C --> D[Registra movimiento de salida/ajuste]
     D --> E[Actualiza saldo y alerta]
@@ -140,7 +140,7 @@ Una operación incierta queda visible para revisión y no se reintenta sin idemp
 
 ```mermaid
 flowchart TD
-    A[Se detecta error en entrega confirmada] --> B[Depósito o Admin anula con motivo]
+    A[Se detecta error en entrega confirmada] --> B[Administrador anula con motivo]
     B --> C[Se generan movimientos compensatorios]
     C --> D[La entrega original queda anulada y visible]
     D --> E[Se crea una nueva entrega efectiva]
