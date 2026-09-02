@@ -13,8 +13,10 @@ export const metadata: Metadata = {
 }
 
 const themeScript = `(() => {
-  const key = 'sigas-theme';
-  const stored = localStorage.getItem(key);
+  let stored = null;
+  try {
+    stored = localStorage.getItem('sigas-theme');
+  } catch {}
   const theme = stored === 'sanbenito-light' || stored === 'sanbenito-dark'
     ? stored
     : (matchMedia('(prefers-color-scheme: dark)').matches ? 'sanbenito-dark' : 'sanbenito-light');
@@ -25,9 +27,13 @@ export default function RootLayout(props: { children: React.ReactNode }) {
   const { children } = props
 
   return (
-    <html lang="es" suppressHydrationWarning>
+    <html data-theme="sanbenito-light" lang="es" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script
+          dangerouslySetInnerHTML={{ __html: themeScript }}
+          suppressHydrationWarning
+          type={typeof window === 'undefined' ? 'text/javascript' : 'text/plain'}
+        />
       </head>
       <body>{children}</body>
     </html>

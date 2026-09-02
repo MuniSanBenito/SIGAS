@@ -27,20 +27,84 @@ test('shows accessible DNI and password controls', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Ingresar' })).toBeVisible()
 })
 
-test('toggles and persists the selected color theme', async ({ page }) => {
+test('toggles and persists the selected color theme without hydration warnings', async ({ page }) => {
+  const hydrationMessages: string[] = []
+  page.on('console', (message) => {
+    if (/Encountered a script tag|Hydration failed|hydration mismatch/i.test(message.text())) {
+      hydrationMessages.push(message.text())
+    }
+  })
+
   await page.goto(`${serverURL}/login`)
 
   const themeToggle = page.getByRole('button', { name: /Activar modo (oscuro|claro)/ })
   const initialTheme = await page.locator('html').getAttribute('data-theme')
   expect(initialTheme).toMatch(/^sanbenito-(light|dark)$/)
+  const initialIsDark = initialTheme === 'sanbenito-dark'
+  await expect(themeToggle).toHaveAttribute('aria-pressed', String(initialIsDark))
+  await expect(themeToggle).toHaveAttribute('aria-label', initialIsDark ? 'Activar modo claro' : 'Activar modo oscuro')
+  await expect(themeToggle).toHaveAttribute('title', initialIsDark ? 'Modo claro' : 'Modo oscuro')
 
   await themeToggle.click()
   const selectedTheme = await page.locator('html').getAttribute('data-theme')
   expect(selectedTheme).not.toBe(initialTheme)
-  await expect(themeToggle).toHaveAttribute('aria-pressed', selectedTheme === 'sanbenito-dark' ? 'true' : 'false')
+  const selectedIsDark = selectedTheme === 'sanbenito-dark'
+  await expect(themeToggle).toHaveAttribute('aria-pressed', String(selectedIsDark))
+  await expect(themeToggle).toHaveAttribute('aria-label', selectedIsDark ? 'Activar modo claro' : 'Activar modo oscuro')
+  await expect(themeToggle).toHaveAttribute('title', selectedIsDark ? 'Modo claro' : 'Modo oscuro')
 
   await page.reload()
   await expect(page.locator('html')).toHaveAttribute('data-theme', selectedTheme ?? '')
+  await expect(themeToggle).toHaveAttribute('aria-pressed', String(selectedIsDark))
+  await expect(themeToggle).toHaveAttribute('aria-label', selectedIsDark ? 'Activar modo claro' : 'Activar modo oscuro')
+  await expect(themeToggle).toHaveAttribute('title', selectedIsDark ? 'Modo claro' : 'Modo oscuro')
+  expect(hydrationMessages).toEqual([])
+})
+
+test('uses the system color preference when no theme is saved', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'dark' })
+  await page.addInitScript(() => {
+    window.localStorage.removeItem('sigas-theme')
+  })
+  await page.goto(`${serverURL}/login`)
+
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'sanbenito-dark')
+  const themeToggle = page.getByRole('button', { name: 'Activar modo claro' })
+  await expect(themeToggle).toHaveAttribute('aria-pressed', 'true')
+  await expect(themeToggle).toHaveAttribute('title', 'Modo claro')
+})
+
+test('synchronizes theme controls across dashboard breakpoints', async ({ page }) => {
+  const hydrationMessages: string[] = []
+  page.on('console', (message) => {
+    if (/Encountered a script tag|Hydration failed|hydration mismatch/i.test(message.text())) {
+      hydrationMessages.push(message.text())
+    }
+  })
+
+  await page.setViewportSize({ width: 1440, height: 900 })
+  await page.goto(`${serverURL}/login`)
+  await page.getByLabel('DNI').fill(testUser.username)
+  await page.getByLabel('Contraseña').fill(testUser.password)
+  await page.getByRole('button', { name: 'Ingresar' }).click()
+  await expect(page).toHaveURL(`${serverURL}/`)
+
+  const sidebarThemeToggle = page.locator('aside[aria-label="Navegación principal"] button').first()
+  const headerThemeToggle = page.locator('header button').first()
+  const initialTheme = await page.locator('html').getAttribute('data-theme')
+  const expectedTheme = initialTheme === 'sanbenito-dark' ? 'sanbenito-light' : 'sanbenito-dark'
+  const expectedIsDark = expectedTheme === 'sanbenito-dark'
+
+  await sidebarThemeToggle.click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme', expectedTheme)
+  await expect(headerThemeToggle).toHaveAttribute('aria-pressed', String(expectedIsDark))
+  await expect(headerThemeToggle).toHaveAttribute('aria-label', expectedIsDark ? 'Activar modo claro' : 'Activar modo oscuro')
+  await expect(headerThemeToggle).toHaveAttribute('title', expectedIsDark ? 'Modo claro' : 'Modo oscuro')
+
+  await page.setViewportSize({ width: 320, height: 740 })
+  await expect(headerThemeToggle).toBeVisible()
+  await expect(headerThemeToggle).toHaveAttribute('aria-pressed', String(expectedIsDark))
+  expect(hydrationMessages).toEqual([])
 })
 
 test('keeps the user on login and shows a generic error for invalid credentials', async ({ page }) => {
