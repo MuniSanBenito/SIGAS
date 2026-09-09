@@ -6,7 +6,7 @@ import { canAccessModule } from '@/access/roles'
 import config from '@/payload.config'
 
 import { DashboardShell } from '../dashboard-shell'
-import { ModulePlaceholder } from '../module-placeholder'
+import { InventoryWorkspace } from './inventory-workspace'
 
 export default async function InventoryPage() {
   const headers = await getHeaders()
@@ -19,7 +19,7 @@ export default async function InventoryPage() {
 
   return (
     <DashboardShell roles={user.roles}>
-      <ModulePlaceholder description="Acá vas a poder administrar productos, entradas, salidas y ajustes del depósito." title="Inventario" />
+      <InventoryWorkspace />
     </DashboardShell>
   )
 }

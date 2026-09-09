@@ -178,7 +178,10 @@ Catálogo configurable. Debe incluir opciones institucionales y una opción `otr
 - `unidad`: unidades enteras en el MVP;
 - `controla_lote_vencimiento`: booleano;
 - `stock_minimo`;
-- `activo`.
+- `activo`;
+- `motivo_baja` opcional cuando se desactiva lógicamente.
+
+Una desactivación lógica no elimina el producto ni su historial. Si conserva saldo, sigue visible para consultas y puede seleccionarse para salidas, pero no para nuevas entradas ni recetas. Una vez que el producto tiene movimientos, `controla_lote_vencimiento` no puede cambiarse.
 
 ### `LOTE_PRODUCTO`
 
@@ -212,8 +215,10 @@ Libro de movimientos de inventario:
 - `producto_id`;
 - `lote_id` opcional;
 - `tipo`: entrada, salida o ajuste;
-- `cantidad` entera;
-- `motivo`: compra, donación, entrega, vencimiento, pérdida, rotura o ajuste;
+- `cantidad` entera positiva para movimientos persistidos;
+- `direccion_ajuste` opcional: aumento o disminución cuando el tipo es ajuste;
+- `modo_ajuste` opcional: movimiento manual o conteo físico;
+- `motivo`: compra, donación, entrega, vencimiento, pérdida, rotura, ajuste o conteo físico;
 - `fecha_operativa`;
 - `creado_en`;
 - `usuario_id`;
@@ -330,6 +335,8 @@ Debe auditar login, altas, cambios, bajas lógicas, permisos, contribuyentes, gr
 - Toda línea real de entrega tiene producto y cantidad positiva entera.
 - Una entrega confirmada genera movimientos de salida consistentes con sus líneas.
 - El saldo y el libro de movimientos deben coincidir después de cada operación.
+- Una salida nunca puede dejar saldo negativo.
+- Un conteo físico sin diferencia audita la verificación, pero no crea un movimiento de cantidad cero.
 - Una receta histórica no cambia al crear una nueva versión.
 - Un tercero receptor debe ser un contribuyente existente y tener autorización registrada.
 - Un contribuyente puede tener varias membresías activas, pero cada membresía tiene su propio ciclo de vida.

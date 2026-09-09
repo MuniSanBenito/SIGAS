@@ -5,8 +5,17 @@ import { buildConfig } from 'payload'
 import { fileURLToPath } from 'url'
 import sharp from 'sharp'
 
-import { Users } from './collections/Users'
+import { AuditLogs } from './collections/AuditLogs'
+import { inventoryEndpoints } from './endpoints/inventory'
+import { BundleVersions } from './collections/BundleVersions'
+import { Bundles } from './collections/Bundles'
 import { Media } from './collections/Media'
+import { ProductCategories } from './collections/ProductCategories'
+import { ProductLots } from './collections/ProductLots'
+import { Products } from './collections/Products'
+import { StockBalances } from './collections/StockBalances'
+import { StockMovements } from './collections/StockMovements'
+import { Users } from './collections/Users'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
@@ -18,7 +27,18 @@ export default buildConfig({
       baseDir: path.resolve(dirname),
     },
   },
-  collections: [Users, Media],
+  collections: [
+    Users,
+    Media,
+    ProductCategories,
+    Products,
+    ProductLots,
+    StockBalances,
+    StockMovements,
+    Bundles,
+    BundleVersions,
+    AuditLogs,
+  ],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || '',
   typescript: {
@@ -27,6 +47,7 @@ export default buildConfig({
   db: mongooseAdapter({
     url: process.env.DATABASE_URL || '',
   }),
+  endpoints: inventoryEndpoints,
   sharp,
   plugins: [],
 })

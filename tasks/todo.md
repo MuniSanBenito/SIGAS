@@ -48,19 +48,19 @@
 
 ## Phase 2 — Inventory
 
-- [ ] **2.1 Products, lots, balances, and movements**
-  - Acceptance: integer units, minimums, sensitive lots, purchase/donation entries, non-delivery exits, audited corrections.
-  - Verify: saldo/ledger reconciliation tests and lot/expiration tests.
+- [x] **2.1 Products, lots, balances, and movements**
+  - Acceptance: integer units, minimums, sensitive lots, purchase/donation entries, non-delivery exits, physical/manual adjustments, logical product deactivation, idempotent commands, and audited corrections foundation.
+  - Verify: `pnpm run test:int`, `tests/int/inventory-stock.int.spec.ts`, and responsive E2E coverage.
   - Dependencies: 1.1, 1.2.
 
-- [ ] **2.2 Versioned bundle recipes**
-  - Acceptance: recipe versions, historical immutability, and stock projection.
-  - Verify: version and projection tests.
+- [x] **2.2 Versioned bundle recipes**
+  - Acceptance: recipe versions, historical immutability, embedded product lines, and stock projection endpoint/UI.
+  - Verify: recipe validation tests, TypeScript/build checks, and inventory workspace E2E flow.
   - Dependencies: 2.1.
 
-- [ ] **Checkpoint: Inventory**
-  - Acceptance: product entry and versioned recipe flow is usable and reconciles saldo.
-  - Verify: focused tests plus manual review.
+- [x] **Checkpoint: Inventory**
+  - Acceptance: product catalog, entries, exits, physical counts, lot warnings, responsive stock workspace, and versioned recipe flow are usable and reconcile saldo.
+  - Verify: `pnpm run test:int` and `pnpm exec playwright test --config=playwright.config.ts --workers=1`.
   - Dependencies: 2.1, 2.2.
 
 ## Phase 3 — Deliveries and reports

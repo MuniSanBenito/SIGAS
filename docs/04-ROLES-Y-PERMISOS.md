@@ -66,6 +66,8 @@ En esta primera implementación solo se habilitan rutas y navegación para grupo
 
 Una entrega confirmada no se edita ni se borra. El Administrador la anula con motivo y crea una nueva. Ante faltante, el proceso autorizado ajusta las líneas reales y confirma solo lo disponible.
 
+En el módulo de inventario, Control de stock y Administrador operan mediante comandos auditados. Los movimientos y saldos no se modifican desde el CRUD genérico. Una baja de producto es lógica: puede conservar saldo y permitir salidas, pero bloquea nuevas entradas y recetas. El control de lote/vencimiento queda fijo después del primer movimiento del producto.
+
 ## Permisos de contribuyentes
 
 Administración y Administrador pueden editar todos los campos del contribuyente, incluyendo identidad y contacto. Esta capacidad es de alto riesgo y exige:

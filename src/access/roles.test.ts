@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { canAccessModule, getRoles, hasAnyRole, hasRole } from './roles'
+import { canAccessModule, getRoles, hasAnyRole, hasRole, inventoryOperator } from './roles'
 
 describe('role permissions', () => {
   it('recognizes a role assigned to the user', () => {
@@ -28,6 +28,13 @@ describe('role permissions', () => {
     expect(canAccessModule({ roles: ['stock'] }, 'groups')).toBe(false)
     expect(canAccessModule({ roles: ['administracion'] }, 'inventory')).toBe(false)
     expect(canAccessModule({ roles: [] }, 'inventory')).toBe(false)
+  })
+
+  it('allows only inventory operators through the inventory access guard', () => {
+    expect(inventoryOperator({ req: { user: { roles: ['stock'] } } })).toBe(true)
+    expect(inventoryOperator({ req: { user: { roles: ['admin'] } } })).toBe(true)
+    expect(inventoryOperator({ req: { user: { roles: ['administracion'] } } })).toBe(false)
+    expect(inventoryOperator({ req: { user: null } })).toBe(false)
   })
 
   it('ignores missing and unknown roles', () => {

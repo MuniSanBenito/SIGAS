@@ -54,6 +54,9 @@ export function canAccessModule(user: unknown, module: ModuleKey): boolean {
   return hasAnyRole(user, moduleRoles[module])
 }
 
+export const inventoryOperator = ({ req: { user } }: AccessUserArgs): boolean =>
+  canAccessModule(user, 'inventory')
+
 export const authenticated = ({ req: { user } }: AccessUserArgs): boolean => Boolean(user)
 
 export const adminOnly = ({ req: { user } }: AccessUserArgs): boolean => hasRole(user, 'admin')

@@ -3,7 +3,7 @@
 ## Estado
 
 **Cerrado para el primer flujo (Gate 0) con reglas provisionales de avance.**  
-Se pueden revisar con Depósito/Dirección sin bloquear login, padrón mock y grupos.
+El alcance de inventario y recetas queda autorizado para implementación con estas reglas; se pueden revisar con Depósito/Dirección sin bloquear login, padrón mock y grupos.
 
 ## Decisión de avance
 
@@ -62,6 +62,15 @@ Incluidos:
 - entregas por producto;
 - entregas por grupo/persona;
 - entregas con diferencia respecto de la receta.
+
+### 7. Alcance confirmado para inventario
+
+- El stock comienza vacío; no se importa un inventario inicial en este corte.
+- Una baja de producto es lógica y conserva el saldo si todavía existen unidades.
+- Un producto inactivo sigue visible y permite salidas, pero no nuevas entradas ni recetas.
+- El conteo físico puede generar un ajuste positivo o negativo; si no hay diferencia, solo se audita la verificación.
+- Después del primer movimiento no se puede cambiar si el producto controla lote/vencimiento.
+- Las recetas de bolsones se incluyen en el mismo corte y cada modificación crea una nueva versión inmutable.
 
 ## Aprobación operativa
 

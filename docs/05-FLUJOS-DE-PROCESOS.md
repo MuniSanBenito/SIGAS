@@ -117,6 +117,25 @@ flowchart TD
     E --> F[Audita actor, motivo y resultado]
 ```
 
+## Flujo 6 bis — Conteo físico y baja lógica de producto
+
+```mermaid
+flowchart TD
+    A[Control de stock inicia conteo] --> B[Selecciona producto o lote]
+    B --> C[Indica cantidad física contada]
+    C --> D{La diferencia es cero?}
+    D -- Sí --> E[Audita la verificación sin movimiento]
+    D -- No --> F[Genera ajuste positivo o negativo]
+    F --> G[Actualiza saldo y auditoría]
+    H[Control de stock decide retirar un producto] --> I[Indica motivo obligatorio]
+    I --> J[Desactiva el producto sin borrar historial]
+    J --> K{Conserva saldo?}
+    K -- Sí --> L[Se mantiene visible y permite salidas]
+    K -- No --> M[Queda inactivo sin saldo]
+```
+
+La configuración de lote/vencimiento no puede cambiarse después del primer movimiento del producto. Un producto inactivo no recibe nuevas entradas ni se incorpora a recetas.
+
 ## Flujo 7 — Corrección de datos de contribuyente
 
 ```mermaid

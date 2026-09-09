@@ -69,6 +69,14 @@ export interface Config {
   collections: {
     users: User;
     media: Media;
+    'product-categories': ProductCategory;
+    products: Product;
+    'product-lots': ProductLot;
+    'stock-balances': StockBalance;
+    'stock-movements': StockMovement;
+    bundles: Bundle;
+    'bundle-versions': BundleVersion;
+    'audit-logs': AuditLog;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
@@ -78,6 +86,14 @@ export interface Config {
   collectionsSelect: {
     users: UsersSelect<false> | UsersSelect<true>;
     media: MediaSelect<false> | MediaSelect<true>;
+    'product-categories': ProductCategoriesSelect<false> | ProductCategoriesSelect<true>;
+    products: ProductsSelect<false> | ProductsSelect<true>;
+    'product-lots': ProductLotsSelect<false> | ProductLotsSelect<true>;
+    'stock-balances': StockBalancesSelect<false> | StockBalancesSelect<true>;
+    'stock-movements': StockMovementsSelect<false> | StockMovementsSelect<true>;
+    bundles: BundlesSelect<false> | BundlesSelect<true>;
+    'bundle-versions': BundleVersionsSelect<false> | BundleVersionsSelect<true>;
+    'audit-logs': AuditLogsSelect<false> | AuditLogsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
@@ -163,6 +179,167 @@ export interface Media {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "product-categories".
+ */
+export interface ProductCategory {
+  id: string;
+  name: string;
+  isActive: boolean;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "products".
+ */
+export interface Product {
+  id: string;
+  name: string;
+  category: string | ProductCategory;
+  tracksLotExpiration: boolean;
+  minimumStock: number;
+  isActive: boolean;
+  inactiveReason?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "product-lots".
+ */
+export interface ProductLot {
+  id: string;
+  product: string | Product;
+  code: string;
+  expirationDate: string;
+  isActive: boolean;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "stock-balances".
+ */
+export interface StockBalance {
+  id: string;
+  balanceKey: string;
+  product: string | Product;
+  lot?: (string | null) | ProductLot;
+  quantity: number;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "stock-movements".
+ */
+export interface StockMovement {
+  id: string;
+  product: string | Product;
+  lot?: (string | null) | ProductLot;
+  movementType: 'entry' | 'exit' | 'adjustment';
+  quantity: number;
+  adjustmentDirection?: ('increase' | 'decrease') | null;
+  adjustmentMode?: ('manual' | 'physicalCount') | null;
+  reason: string;
+  operationalDate: string;
+  source?: string | null;
+  observation?: string | null;
+  createdBy: string | User;
+  operationKey: string;
+  previousQuantity: number;
+  resultingQuantity: number;
+  correctionOf?: (string | null) | StockMovement;
+  status: 'active' | 'corrected';
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bundles".
+ */
+export interface Bundle {
+  id: string;
+  name: string;
+  description?: string | null;
+  isActive: boolean;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bundle-versions".
+ */
+export interface BundleVersion {
+  id: string;
+  bundle: string | Bundle;
+  version: number;
+  status: 'current' | 'historical';
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+  createdBy: string | User;
+  lines: {
+    product: string | Product;
+    quantity: number;
+    id?: string | null;
+  }[];
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "audit-logs".
+ */
+export interface AuditLog {
+  id: string;
+  actor: string | User;
+  actorRoles:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  module: string;
+  action: string;
+  targetType: string;
+  targetId: string;
+  reason?: string | null;
+  context?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  before?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  after?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  result: 'success' | 'rejected' | 'replayed';
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "payload-kv".
  */
 export interface PayloadKv {
@@ -192,6 +369,38 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'media';
         value: string | Media;
+      } | null)
+    | ({
+        relationTo: 'product-categories';
+        value: string | ProductCategory;
+      } | null)
+    | ({
+        relationTo: 'products';
+        value: string | Product;
+      } | null)
+    | ({
+        relationTo: 'product-lots';
+        value: string | ProductLot;
+      } | null)
+    | ({
+        relationTo: 'stock-balances';
+        value: string | StockBalance;
+      } | null)
+    | ({
+        relationTo: 'stock-movements';
+        value: string | StockMovement;
+      } | null)
+    | ({
+        relationTo: 'bundles';
+        value: string | Bundle;
+      } | null)
+    | ({
+        relationTo: 'bundle-versions';
+        value: string | BundleVersion;
+      } | null)
+    | ({
+        relationTo: 'audit-logs';
+        value: string | AuditLog;
       } | null);
   globalSlug?: string | null;
   user: {
@@ -276,6 +485,129 @@ export interface MediaSelect<T extends boolean = true> {
   height?: T;
   focalX?: T;
   focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "product-categories_select".
+ */
+export interface ProductCategoriesSelect<T extends boolean = true> {
+  name?: T;
+  isActive?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "products_select".
+ */
+export interface ProductsSelect<T extends boolean = true> {
+  name?: T;
+  category?: T;
+  tracksLotExpiration?: T;
+  minimumStock?: T;
+  isActive?: T;
+  inactiveReason?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "product-lots_select".
+ */
+export interface ProductLotsSelect<T extends boolean = true> {
+  product?: T;
+  code?: T;
+  expirationDate?: T;
+  isActive?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "stock-balances_select".
+ */
+export interface StockBalancesSelect<T extends boolean = true> {
+  balanceKey?: T;
+  product?: T;
+  lot?: T;
+  quantity?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "stock-movements_select".
+ */
+export interface StockMovementsSelect<T extends boolean = true> {
+  product?: T;
+  lot?: T;
+  movementType?: T;
+  quantity?: T;
+  adjustmentDirection?: T;
+  adjustmentMode?: T;
+  reason?: T;
+  operationalDate?: T;
+  source?: T;
+  observation?: T;
+  createdBy?: T;
+  operationKey?: T;
+  previousQuantity?: T;
+  resultingQuantity?: T;
+  correctionOf?: T;
+  status?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bundles_select".
+ */
+export interface BundlesSelect<T extends boolean = true> {
+  name?: T;
+  description?: T;
+  isActive?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "bundle-versions_select".
+ */
+export interface BundleVersionsSelect<T extends boolean = true> {
+  bundle?: T;
+  version?: T;
+  status?: T;
+  effectiveFrom?: T;
+  effectiveTo?: T;
+  createdBy?: T;
+  lines?:
+    | T
+    | {
+        product?: T;
+        quantity?: T;
+        id?: T;
+      };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "audit-logs_select".
+ */
+export interface AuditLogsSelect<T extends boolean = true> {
+  actor?: T;
+  actorRoles?: T;
+  module?: T;
+  action?: T;
+  targetType?: T;
+  targetId?: T;
+  reason?: T;
+  context?: T;
+  before?: T;
+  after?: T;
+  result?: T;
+  updatedAt?: T;
+  createdAt?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

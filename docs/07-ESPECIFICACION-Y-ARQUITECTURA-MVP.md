@@ -300,6 +300,10 @@ Cerrados para el primer flujo:
 4. **Corrección de entrega:** se anula y se crea una nueva. La original no se borra.
 5. **Consistencia Mongo/padrón:** resultados `confirmada` / `rechazada` / `incierta`; una operación incierta no se reintenta sin verificación.
 6. **Colecciones propias:** SIGAS usa MongoDB propio.
+7. **Inventario:** stock y Administrador operan entradas, salidas, ajustes, lotes, desactivaciones lógicas y recetas; Administración no modifica inventario.
+8. **Producto inactivo:** puede conservar saldo y permitir salidas, pero no nuevas entradas ni recetas.
+9. **Ajustes:** se admiten movimientos manuales y conteos físicos; una verificación sin diferencia solo genera auditoría.
+10. **Transacciones:** el flujo de stock requiere MongoDB con replica set y propaga `req` en todas las operaciones anidadas.
 
 Siguen pendientes para producción, no para el primer flujo:
 
