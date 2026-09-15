@@ -26,6 +26,7 @@ describe('role permissions', () => {
 
   it('does not grant module access to users without the corresponding role', () => {
     expect(canAccessModule({ roles: ['stock'] }, 'groups')).toBe(false)
+    expect(canAccessModule({ roles: ['administracion'] }, 'groups')).toBe(true)
     expect(canAccessModule({ roles: ['administracion'] }, 'inventory')).toBe(false)
     expect(canAccessModule({ roles: [] }, 'inventory')).toBe(false)
   })

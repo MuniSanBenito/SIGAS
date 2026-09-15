@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 
-import { IconHome, IconLogout, IconMenu2, IconPackages, IconUsers, IconX } from '@tabler/icons-react'
+import { IconHeartHandshake, IconHome, IconLogout, IconMenu2, IconPackages, IconUsers, IconX } from '@tabler/icons-react'
 
 import { canAccessModule, type ModuleKey, type Role } from '@/access/roles'
 
@@ -26,6 +26,7 @@ type NavigationItem = {
 const navigationItems: NavigationItem[] = [
   { href: '/', icon: IconHome, label: 'Inicio' },
   { href: '/grupos', icon: IconUsers, label: 'Grupos familiares', module: 'groups' },
+  { href: '/entregas', icon: IconHeartHandshake, label: 'Entregas', module: 'deliveries' },
   { href: '/inventario', icon: IconPackages, label: 'Inventario', module: 'inventory' },
 ]
 

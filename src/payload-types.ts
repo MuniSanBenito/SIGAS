@@ -76,6 +76,12 @@ export interface Config {
     'stock-movements': StockMovement;
     bundles: Bundle;
     'bundle-versions': BundleVersion;
+    'kinship-relations': KinshipRelation;
+    'family-groups': FamilyGroup;
+    'group-members': GroupMember;
+    deliveries: Delivery;
+    'delivery-bundles': DeliveryBundle;
+    'delivery-lines': DeliveryLine;
     'audit-logs': AuditLog;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
@@ -93,6 +99,12 @@ export interface Config {
     'stock-movements': StockMovementsSelect<false> | StockMovementsSelect<true>;
     bundles: BundlesSelect<false> | BundlesSelect<true>;
     'bundle-versions': BundleVersionsSelect<false> | BundleVersionsSelect<true>;
+    'kinship-relations': KinshipRelationsSelect<false> | KinshipRelationsSelect<true>;
+    'family-groups': FamilyGroupsSelect<false> | FamilyGroupsSelect<true>;
+    'group-members': GroupMembersSelect<false> | GroupMembersSelect<true>;
+    deliveries: DeliveriesSelect<false> | DeliveriesSelect<true>;
+    'delivery-bundles': DeliveryBundlesSelect<false> | DeliveryBundlesSelect<true>;
+    'delivery-lines': DeliveryLinesSelect<false> | DeliveryLinesSelect<true>;
     'audit-logs': AuditLogsSelect<false> | AuditLogsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
@@ -250,6 +262,8 @@ export interface StockMovement {
   previousQuantity: number;
   resultingQuantity: number;
   correctionOf?: (string | null) | StockMovement;
+  referenceType?: string | null;
+  referenceId?: string | null;
   status: 'active' | 'corrected';
   updatedAt: string;
   createdAt: string;
@@ -283,6 +297,103 @@ export interface BundleVersion {
     quantity: number;
     id?: string | null;
   }[];
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "kinship-relations".
+ */
+export interface KinshipRelation {
+  id: string;
+  label: string;
+  code: string;
+  requiresObservation: boolean;
+  isActive: boolean;
+  sortOrder: number;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "family-groups".
+ */
+export interface FamilyGroup {
+  id: string;
+  status: 'active' | 'inactive';
+  referenteContributorId: string;
+  startedAt: string;
+  endedAt?: string | null;
+  endReason?: string | null;
+  observations?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "group-members".
+ */
+export interface GroupMember {
+  id: string;
+  group: string | FamilyGroup;
+  contributorId: string;
+  kinship: string | KinshipRelation;
+  isReferent: boolean;
+  status: 'active' | 'inactive';
+  startedAt: string;
+  endedAt?: string | null;
+  endReason?: string | null;
+  multiGroupReason?: string | null;
+  kinshipObservation?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "deliveries".
+ */
+export interface Delivery {
+  id: string;
+  group: string | FamilyGroup;
+  deliveryDate: string;
+  confirmedAt: string;
+  confirmedBy: string | User;
+  receiverContributorId: string;
+  receiverIsThirdParty: boolean;
+  receiverAuthorizationReason?: string | null;
+  observations?: string | null;
+  recipeDiffReason?: string | null;
+  operationKey: string;
+  status: 'confirmed';
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "delivery-bundles".
+ */
+export interface DeliveryBundle {
+  id: string;
+  delivery: string | Delivery;
+  bundleVersion: string | BundleVersion;
+  quantity: number;
+  modificationNote?: string | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "delivery-lines".
+ */
+export interface DeliveryLine {
+  id: string;
+  delivery: string | Delivery;
+  product: string | Product;
+  lot?: (string | null) | ProductLot;
+  bundleVersion?: (string | null) | BundleVersion;
+  quantity: number;
+  observation?: string | null;
+  operationKey: string;
   updatedAt: string;
   createdAt: string;
 }
@@ -397,6 +508,30 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'bundle-versions';
         value: string | BundleVersion;
+      } | null)
+    | ({
+        relationTo: 'kinship-relations';
+        value: string | KinshipRelation;
+      } | null)
+    | ({
+        relationTo: 'family-groups';
+        value: string | FamilyGroup;
+      } | null)
+    | ({
+        relationTo: 'group-members';
+        value: string | GroupMember;
+      } | null)
+    | ({
+        relationTo: 'deliveries';
+        value: string | Delivery;
+      } | null)
+    | ({
+        relationTo: 'delivery-bundles';
+        value: string | DeliveryBundle;
+      } | null)
+    | ({
+        relationTo: 'delivery-lines';
+        value: string | DeliveryLine;
       } | null)
     | ({
         relationTo: 'audit-logs';
@@ -554,6 +689,8 @@ export interface StockMovementsSelect<T extends boolean = true> {
   previousQuantity?: T;
   resultingQuantity?: T;
   correctionOf?: T;
+  referenceType?: T;
+  referenceId?: T;
   status?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -587,6 +724,97 @@ export interface BundleVersionsSelect<T extends boolean = true> {
         quantity?: T;
         id?: T;
       };
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "kinship-relations_select".
+ */
+export interface KinshipRelationsSelect<T extends boolean = true> {
+  label?: T;
+  code?: T;
+  requiresObservation?: T;
+  isActive?: T;
+  sortOrder?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "family-groups_select".
+ */
+export interface FamilyGroupsSelect<T extends boolean = true> {
+  status?: T;
+  referenteContributorId?: T;
+  startedAt?: T;
+  endedAt?: T;
+  endReason?: T;
+  observations?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "group-members_select".
+ */
+export interface GroupMembersSelect<T extends boolean = true> {
+  group?: T;
+  contributorId?: T;
+  kinship?: T;
+  isReferent?: T;
+  status?: T;
+  startedAt?: T;
+  endedAt?: T;
+  endReason?: T;
+  multiGroupReason?: T;
+  kinshipObservation?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "deliveries_select".
+ */
+export interface DeliveriesSelect<T extends boolean = true> {
+  group?: T;
+  deliveryDate?: T;
+  confirmedAt?: T;
+  confirmedBy?: T;
+  receiverContributorId?: T;
+  receiverIsThirdParty?: T;
+  receiverAuthorizationReason?: T;
+  observations?: T;
+  recipeDiffReason?: T;
+  operationKey?: T;
+  status?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "delivery-bundles_select".
+ */
+export interface DeliveryBundlesSelect<T extends boolean = true> {
+  delivery?: T;
+  bundleVersion?: T;
+  quantity?: T;
+  modificationNote?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "delivery-lines_select".
+ */
+export interface DeliveryLinesSelect<T extends boolean = true> {
+  delivery?: T;
+  product?: T;
+  lot?: T;
+  bundleVersion?: T;
+  quantity?: T;
+  observation?: T;
+  operationKey?: T;
   updatedAt?: T;
   createdAt?: T;
 }

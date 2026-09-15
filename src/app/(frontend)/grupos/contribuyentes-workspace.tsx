@@ -52,7 +52,13 @@ function errorMessage(payload: unknown, fallback: string): string {
   return typeof message === 'string' ? message : fallback
 }
 
-export function ContribuyentesWorkspace({ roles }: { roles: readonly Role[] }) {
+export function ContribuyentesWorkspace({
+  embedded = false,
+  roles,
+}: {
+  embedded?: boolean
+  roles: readonly Role[]
+}) {
   const canEdit = roles.includes('admin') || roles.includes('administracion')
   const [contributors, setContributors] = useState<Contribuyente[]>([])
   const [search, setSearch] = useState('')
@@ -166,11 +172,15 @@ export function ContribuyentesWorkspace({ roles }: { roles: readonly Role[] }) {
   }
 
   return (
-    <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-12" id="main-content">
+    <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-10 lg:px-10 lg:py-12" id={embedded ? undefined : 'main-content'}>
       <div className="flex flex-col gap-5 border-b border-line pb-7 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Padrón municipal</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-content sm:text-4xl">Contribuyentes</h1>
+          {embedded ? (
+            <h2 className="mt-2 text-2xl font-bold tracking-tight text-content sm:text-3xl">Contribuyentes</h2>
+          ) : (
+            <h1 className="mt-2 text-3xl font-bold tracking-tight text-content sm:text-4xl">Contribuyentes</h1>
+          )}
           <p className="mt-3 max-w-2xl text-base leading-7 text-content-muted">Consultá y actualizá el padrón oficial sin duplicar sus datos en SIGAS.</p>
         </div>
         {canEdit && <button className="btn btn-primary min-h-11 gap-2 self-start sm:self-auto" onClick={openCreate} type="button"><IconPlus aria-hidden="true" size={18} />Nuevo contribuyente</button>}

@@ -6,7 +6,15 @@ import { fileURLToPath } from 'url'
 import sharp from 'sharp'
 
 import { AuditLogs } from './collections/AuditLogs'
+import { Deliveries } from './collections/Deliveries'
+import { DeliveryBundles } from './collections/DeliveryBundles'
+import { DeliveryLines } from './collections/DeliveryLines'
+import { FamilyGroups } from './collections/FamilyGroups'
+import { GroupMembers } from './collections/GroupMembers'
+import { KinshipRelations } from './collections/KinshipRelations'
 import { contribuyenteEndpoints } from './endpoints/contribuyentes'
+import { deliveryEndpoints } from './endpoints/entregas'
+import { groupEndpoints } from './endpoints/grupos'
 import { inventoryEndpoints } from './endpoints/inventory'
 import { BundleVersions } from './collections/BundleVersions'
 import { Bundles } from './collections/Bundles'
@@ -38,6 +46,12 @@ export default buildConfig({
     StockMovements,
     Bundles,
     BundleVersions,
+    KinshipRelations,
+    FamilyGroups,
+    GroupMembers,
+    Deliveries,
+    DeliveryBundles,
+    DeliveryLines,
     AuditLogs,
   ],
   editor: lexicalEditor(),
@@ -48,7 +62,7 @@ export default buildConfig({
   db: mongooseAdapter({
     url: process.env.DATABASE_URL || '',
   }),
-  endpoints: [...inventoryEndpoints, ...contribuyenteEndpoints],
+  endpoints: [...inventoryEndpoints, ...contribuyenteEndpoints, ...groupEndpoints, ...deliveryEndpoints],
   sharp,
   plugins: [],
 })

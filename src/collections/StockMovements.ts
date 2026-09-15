@@ -102,6 +102,14 @@ export const StockMovements: CollectionConfig = {
       relationTo: 'stock-movements',
     },
     {
+      name: 'referenceType',
+      type: 'text',
+    },
+    {
+      name: 'referenceId',
+      type: 'text',
+    },
+    {
       name: 'status',
       type: 'select',
       defaultValue: 'active',

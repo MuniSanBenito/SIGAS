@@ -37,8 +37,8 @@
   - Dependencies: 0.1, 1.1.
 
 - [x] **1.4 Family groups**
-  - Acceptance: group creation requires a valid mock contributor ID; membership warns on multiple active groups.
-  - Verify: collections and `/grupos` screen exist.
+  - Acceptance: group creation requires a valid contributor reference and referent; membership warns on multiple active groups with required reason; soft deactivation preserves history.
+  - Verify: `src/groups/*`, `/api/grupos`, `/api/parentescos`, tabbed `/grupos` UI, `src/groups/validation.test.ts`, `tests/int/groups-collections.int.spec.ts`.
   - Dependencies: 1.2, 1.3.
 
 - [ ] **Checkpoint: Foundation**
@@ -65,9 +65,9 @@
 
 ## Phase 3 — Deliveries and reports
 
-- [ ] **3.1 Effective mixed deliveries**
-  - Acceptance: group/person target, authorized receiver, multiple bundle versions, modifications, loose products, lots, real-line stock exits, separate delivery/confirmation dates.
-  - Verify: domain, transaction, permission, and acceptance tests for group/individual/third-party deliveries.
+- [x] **3.1 Effective mixed deliveries (group destination only)**
+  - Acceptance: group-only target (person destination explicitly rejected), member/third-party receiver with authorization reason, multiple bundle versions, loose products, manual lots, real-line stock exits in one Mongo transaction, separate delivery/confirmation dates. Individual destination, area, annulment (3.3), and reports (3.2) remain out of scope.
+  - Verify: `src/deliveries/validation.test.ts`, `src/endpoints/entregas.test.ts`, `tests/int/deliveries.int.spec.ts`, e2e role gating in `tests/e2e/roles.e2e.spec.ts`, `pnpm run build`, browser check of grupo → propuesta → confirmar → saldo.
   - Dependencies: 1.4, 2.1, 2.2, 0.2.
 
 - [ ] **3.2 History and operational reports**
