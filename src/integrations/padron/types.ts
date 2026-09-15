@@ -28,6 +28,7 @@ export interface PadronResult<T> {
 
 export interface PadronContributor {
   id: string
+  numeroContribuyente?: number | string
   dni: string
   cuit?: string
   firstName: string
@@ -36,7 +37,9 @@ export interface PadronContributor {
   phone?: string
   address: string
   neighborhood: string
+  email?: string
   isActive: boolean
+  raw?: Record<string, unknown>
 }
 
 export interface SearchContributorsInput {
@@ -54,6 +57,7 @@ export interface CreateContributorInput {
   lastName: string
   birthDate?: string
   phone?: string
+  email?: string
   address: string
   neighborhood: string
   isActive?: boolean
@@ -67,19 +71,9 @@ export interface IdempotencyOptions {
 
 export interface PadronAdapter {
   search(input: SearchContributorsInput): Promise<PadronResult<PadronContributor[]>>
-  create(
-    input: CreateContributorInput,
-    options: IdempotencyOptions,
-  ): Promise<PadronResult<PadronContributor>>
-  update(
-    id: string,
-    input: UpdateContributorInput,
-    options: IdempotencyOptions,
-  ): Promise<PadronResult<PadronContributor>>
-  deactivate(
-    id: string,
-    options: IdempotencyOptions,
-  ): Promise<PadronResult<PadronContributor>>
+  create(input: CreateContributorInput, options: IdempotencyOptions): Promise<PadronResult<PadronContributor>>
+  update(id: string, input: UpdateContributorInput, options: IdempotencyOptions): Promise<PadronResult<PadronContributor>>
+  deactivate(id: string, options: IdempotencyOptions): Promise<PadronResult<PadronContributor>>
 }
 
 export interface MockPadronAdapterOptions {

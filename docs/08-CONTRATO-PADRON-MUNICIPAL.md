@@ -7,13 +7,22 @@ Pendiente de validación formal con Infraestructura antes de conectar el padrón
 
 Este documento define la información técnica mínima que SIGAS necesita para conectarse al padrón en vivo. No se deben pegar aquí contraseñas, tokens, datos personales reales ni cadenas de conexión completas.
 
+La conexión HTTP server-side requiere estas variables de entorno en cada ambiente:
+
+```env
+EXTERNAL_API_BASE_URL=https://sanbenito.gob.ar/api
+EXTERNAL_API_KEY=TOKEN_PRIVADO
+```
+
+`EXTERNAL_API_KEY` nunca debe tener prefijo `NEXT_PUBLIC_` ni llegar al navegador.
+
 ## Objetivo
 
 Permitir que SIGAS consulte, cree y actualice contribuyentes en la base municipal sin duplicar el padrón en MongoDB.
 
 ## Decisión de avance para el primer flujo
 
-Para no bloquear el arranque, el primer corte usará un **adaptador de padrón con implementación mock**. El contrato de dominio queda fijo; el motor real se conecta después sin cambiar grupos, entregas ni auditoría.
+El primer corte usó un adaptador de padrón con implementación mock. SIGAS ahora conecta el motor real mediante un cliente HTTP server-side y un BFF autenticado, sin persistir una copia local de contribuyentes.
 
 Supuestos adoptados:
 

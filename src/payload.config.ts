@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url'
 import sharp from 'sharp'
 
 import { AuditLogs } from './collections/AuditLogs'
+import { contribuyenteEndpoints } from './endpoints/contribuyentes'
 import { inventoryEndpoints } from './endpoints/inventory'
 import { BundleVersions } from './collections/BundleVersions'
 import { Bundles } from './collections/Bundles'
@@ -47,7 +48,7 @@ export default buildConfig({
   db: mongooseAdapter({
     url: process.env.DATABASE_URL || '',
   }),
-  endpoints: inventoryEndpoints,
+  endpoints: [...inventoryEndpoints, ...contribuyenteEndpoints],
   sharp,
   plugins: [],
 })

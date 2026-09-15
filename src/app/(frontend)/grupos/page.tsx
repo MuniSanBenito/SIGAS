@@ -6,7 +6,7 @@ import { canAccessModule } from '@/access/roles'
 import config from '@/payload.config'
 
 import { DashboardShell } from '../dashboard-shell'
-import { ModulePlaceholder } from '../module-placeholder'
+import { ContribuyentesWorkspace } from './contribuyentes-workspace'
 
 export default async function GroupsPage() {
   const headers = await getHeaders()
@@ -19,7 +19,7 @@ export default async function GroupsPage() {
 
   return (
     <DashboardShell roles={user.roles}>
-      <ModulePlaceholder description="Acá vas a poder administrar contribuyentes y grupos familiares." title="Grupos familiares" />
+      <ContribuyentesWorkspace roles={user.roles ?? []} />
     </DashboardShell>
   )
 }
