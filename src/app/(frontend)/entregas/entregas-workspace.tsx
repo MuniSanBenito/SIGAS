@@ -979,7 +979,7 @@ function RealLinesReview(props: {  deliveryDate: string
     <section className="mt-8 rounded-box border border-line bg-surface p-5 shadow-sm">
       <h2 className="text-lg font-bold text-content">4. Líneas reales y confirmación</h2>
       <p className="mt-1 text-sm text-content-muted">
-        Ajustá cantidades y lotes. Solo se descuenta lo que confirmes acá.
+        Ajustá cantidades y, si querés, elegí el lote. Solo se descuenta lo que confirmes acá.
       </p>
 
       <div className="mt-4 overflow-x-auto rounded-box border border-line">
@@ -1025,7 +1025,7 @@ function RealLinesReview(props: {  deliveryDate: string
                       }}
                       value={line.lotId}
                     >
-                      <option value="">Elegir lote</option>
+                      <option value="">Sin especificar (opcional)</option>
                       {line.lots.map((lot) => (
                         <option key={lot.id} value={lot.id}>
                           {lot.code} · vto {lot.expirationDate.slice(0, 10)} · {lot.quantity}u

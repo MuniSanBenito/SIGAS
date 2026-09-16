@@ -316,4 +316,95 @@ describe('deliveries service', () => {
       }),
     ).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 })
   })
+
+  it(
+    'confirms a lot-controlled product without selecting a lot and allocates stock automatically',
+    async () => {
+    const lotRunKey = `${runKey}-lot`
+    const lotProduct = (await payload.create({
+      collection: 'products',
+      data: {
+        category: categoryId,
+        isActive: true,
+        minimumStock: 0,
+        name: `Delivery lot product ${lotRunKey}`,
+        tracksLotExpiration: true,
+      },
+      overrideAccess: true,
+    })) as Product
+
+    const lot = await payload.create({
+      collection: 'product-lots',
+      data: {
+        code: `LOT-${lotRunKey}`,
+        expirationDate: '2026-12-31',
+        isActive: true,
+        product: lotProduct.id,
+      },
+      overrideAccess: true,
+    })
+
+    const inventoryReq = { payload, user: actor } as unknown as InventoryRequest
+    await recordStockMovement(inventoryReq, {
+      operationKey: `${lotRunKey}-entry`,
+      movement: {
+        mode: 'entry',
+        lotId: lot.id,
+        operationalDate: '2026-09-01',
+        productId: lotProduct.id,
+        quantity: 5,
+        reason: 'purchase',
+      },
+    })
+
+    const req = { payload, user: actor } as unknown as DeliveryRequest
+    const confirmed = await confirmDelivery(req, {
+      groupId,
+      receiverContributorId: 'contrib-1',
+      receiverIsThirdParty: false,
+      deliveryDate: '2026-09-15',
+      operationKey: `${lotRunKey}-confirm`,
+      bundles: [],
+      lines: [{ productId: lotProduct.id, quantity: 2 }],
+    })
+    createdDeliveryIds.push(confirmed.delivery.id)
+
+    const balance = await payload.find({
+      collection: 'stock-balances',
+      limit: 1,
+      overrideAccess: true,
+      where: { balanceKey: { equals: `${lotProduct.id}:${lot.id}` } },
+    })
+    expect(balance.docs[0]?.quantity).toBe(3)
+
+    const movements = await payload.find({
+      collection: 'stock-movements',
+      limit: 10,
+      overrideAccess: true,
+      where: { operationKey: { contains: `${lotRunKey}-confirm` } },
+    })
+    expect(movements.totalDocs).toBe(1)
+    expect(movements.docs[0]).toMatchObject({
+      quantity: 2,
+      reason: 'delivery',
+    })
+    expect(movements.docs[0]?.lot).toEqual(
+      expect.objectContaining({ id: lot.id }),
+    )
+
+    await payload.delete({
+      collection: 'stock-movements',
+      where: { operationKey: { contains: lotRunKey } },
+      overrideAccess: true,
+    })
+    await payload.delete({
+      collection: 'stock-balances',
+      where: { product: { equals: lotProduct.id } },
+      overrideAccess: true,
+    })
+    await payload.delete({ collection: 'product-lots', id: lot.id, overrideAccess: true })
+    await payload.delete({ collection: 'products', id: lotProduct.id, overrideAccess: true })
+    },
+    15000,
+  )
 })

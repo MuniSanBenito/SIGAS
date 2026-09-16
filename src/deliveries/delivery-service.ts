@@ -42,6 +42,55 @@ function balanceKey(productId: string, lotId?: string): string {
   return `${productId}:${lotId ?? 'general'}`
 }
 
+type LotWithStock = {
+  id: string
+  code: string
+  expirationDate: string
+  quantity: number
+}
+
+async function getLotsWithStockForProduct(
+  req: DeliveryRequest,
+  product: Product,
+  lots: ProductLot[],
+): Promise<LotWithStock[]> {
+  const productLots = lots.filter((lot) => relationId(lot.product) === product.id && lot.isActive)
+  return Promise.all(
+    productLots.map(async (lot) => ({
+      id: lot.id,
+      code: lot.code,
+      expirationDate: lot.expirationDate,
+      quantity: await getBalance(req, product.id, lot.id),
+    })),
+  )
+}
+
+function availableQuantityFromLots(lotsWithStock: LotWithStock[], asOfDate: string): number {
+  return lotsWithStock
+    .filter((lot) => lot.expirationDate.slice(0, 10) >= asOfDate)
+    .reduce((total, lot) => total + lot.quantity, 0)
+}
+
+function allocateLotsFEFO(
+  lotsWithStock: LotWithStock[],
+  asOfDate: string,
+  quantity: number,
+): { lotId: string; quantity: number }[] {
+  const eligible = lotsWithStock
+    .filter((lot) => lot.expirationDate.slice(0, 10) >= asOfDate && lot.quantity > 0)
+    .sort((left, right) => left.expirationDate.localeCompare(right.expirationDate))
+
+  const allocations: { lotId: string; quantity: number }[] = []
+  let remaining = quantity
+  for (const lot of eligible) {
+    if (remaining <= 0) break
+    const taken = Math.min(lot.quantity, remaining)
+    allocations.push({ lotId: lot.id, quantity: taken })
+    remaining -= taken
+  }
+  return allocations
+}
+
 function assertAdmin(req: DeliveryRequest): User {
   if (!req.user) throw new DeliveryError('UNAUTHENTICATED', 'La sesión es obligatoria.', 401)
   if (!hasRole(req.user, 'admin')) {
@@ -238,20 +287,10 @@ export async function buildProposal(
     const product = products.get(line.productId)
     if (!product) throw new DeliveryError('NOT_FOUND', 'Producto no encontrado.', 404)
 
-    const productLots = lots.filter((lot) => relationId(lot.product) === product.id && lot.isActive)
-    const lotsWithStock = await Promise.all(
-      productLots.map(async (lot) => ({
-        id: lot.id,
-        code: lot.code,
-        expirationDate: lot.expirationDate,
-        quantity: await getBalance(req, product.id, lot.id),
-      })),
-    )
+    const lotsWithStock = await getLotsWithStockForProduct(req, product, lots)
 
     const availableQuantity = product.tracksLotExpiration
-      ? lotsWithStock
-          .filter((lot) => lot.expirationDate.slice(0, 10) >= todayKey)
-          .reduce((total, lot) => total + lot.quantity, 0)
+      ? availableQuantityFromLots(lotsWithStock, todayKey)
       : await getBalance(req, product.id)
 
     lines.push({
@@ -272,24 +311,19 @@ async function validateLineLot(
   lotId: string | undefined,
   deliveryDate: string,
 ): Promise<void> {
-  if (product.tracksLotExpiration) {
-    if (!lotId) {
-      throw new DeliveryError('VALIDATION_ERROR', `El producto ${product.name} exige seleccionar un lote.`, 422)
-    }
-    const lot = await getLot(req, lotId)
-    if (relationId(lot.product) !== product.id) {
-      throw new DeliveryError('VALIDATION_ERROR', 'El lote no pertenece al producto seleccionado.', 422)
-    }
-    if (!lot.isActive) {
-      throw new DeliveryError('CONFLICT', 'No se puede entregar un lote inactivo.', 409)
-    }
-    if (lot.expirationDate.slice(0, 10) < deliveryDate) {
-      throw new DeliveryError('CONFLICT', 'No se puede entregar un lote vencido.', 409)
-    }
-    return
-  }
-  if (lotId) {
+  if (!lotId) return
+  if (!product.tracksLotExpiration) {
     throw new DeliveryError('VALIDATION_ERROR', `El producto ${product.name} no usa lotes.`, 422)
+  }
+  const lot = await getLot(req, lotId)
+  if (relationId(lot.product) !== product.id) {
+    throw new DeliveryError('VALIDATION_ERROR', 'El lote no pertenece al producto seleccionado.', 422)
+  }
+  if (!lot.isActive) {
+    throw new DeliveryError('CONFLICT', 'No se puede entregar un lote inactivo.', 409)
+  }
+  if (lot.expirationDate.slice(0, 10) < deliveryDate) {
+    throw new DeliveryError('CONFLICT', 'No se puede entregar un lote vencido.', 409)
   }
 }
 
@@ -469,13 +503,39 @@ export async function confirmDelivery(req: DeliveryRequest, input: unknown): Pro
     await validateLineLot(req, product, line.lotId, parsed.deliveryDate)
   }
 
+  const lotControlledIds = Array.from(products.values())
+    .filter((product) => product.tracksLotExpiration)
+    .map((product) => product.id)
+  const lotsByProduct = new Map<string, LotWithStock[]>()
+  if (lotControlledIds.length > 0) {
+    const lotsResult = await req.payload.find({
+      collection: 'product-lots',
+      depth: 0,
+      limit: 1000,
+      overrideAccess: true,
+      req,
+      where: { product: { in: lotControlledIds } },
+    })
+    const allLots = lotsResult.docs as ProductLot[]
+    for (const productId of lotControlledIds) {
+      const product = products.get(productId)
+      if (!product) continue
+      lotsByProduct.set(productId, await getLotsWithStockForProduct(req, product, allLots))
+    }
+  }
+
   for (const line of parsed.lines) {
-    const available = await getBalance(req, line.productId, line.lotId)
+    const product = products.get(line.productId)
+    if (!product) throw new DeliveryError('NOT_FOUND', 'Producto no encontrado.', 404)
+    const available = line.lotId
+      ? await getBalance(req, line.productId, line.lotId)
+      : product.tracksLotExpiration
+        ? availableQuantityFromLots(lotsByProduct.get(line.productId) ?? [], parsed.deliveryDate)
+        : await getBalance(req, line.productId)
     if (available < line.quantity) {
-      const product = products.get(line.productId)
       throw new DeliveryError(
         'INSUFFICIENT_STOCK',
-        `Stock insuficiente para ${product?.name ?? line.productId}. Disponible: ${available}, solicitado: ${line.quantity}.`,
+        `Stock insuficiente para ${product.name}. Disponible: ${available}, solicitado: ${line.quantity}.`,
         409,
         { productId: line.productId, lotId: line.lotId, available, requested: line.quantity },
       )
@@ -526,6 +586,8 @@ export async function confirmDelivery(req: DeliveryRequest, input: unknown): Pro
     let lineIndex = 0
     for (const line of parsed.lines) {
       lineIndex += 1
+      const product = products.get(line.productId)
+      if (!product) throw new DeliveryError('NOT_FOUND', 'Producto no encontrado.', 404)
       const lineOperationKey = `${operationKey}:line:${lineIndex}`
       const existingLine = await txReq.payload.find({
         collection: 'delivery-lines',
@@ -552,28 +614,41 @@ export async function confirmDelivery(req: DeliveryRequest, input: unknown): Pro
         })
       }
 
-      const stockResult = await recordStockMovement(inventoryReq, {
-        operationKey: lineOperationKey,
-        movement: {
-          mode: 'exit',
-          productId: line.productId,
-          ...(line.lotId ? { lotId: line.lotId } : {}),
-          operationalDate: parsed.deliveryDate,
-          observation: `Entrega a grupo ${group.id}`,
-          source: 'delivery',
-          quantity: line.quantity,
-          reason: 'delivery',
-        },
-      })
-      const movementId = stockResult.movement?.id
-      if (movementId) {
-        await txReq.payload.update({
-          collection: 'stock-movements',
-          data: { referenceId: delivery.id, referenceType: 'delivery' },
-          id: movementId,
-          overrideAccess: true,
-          req: txReq,
+      const stockExits =
+        !line.lotId && product.tracksLotExpiration
+          ? allocateLotsFEFO(lotsByProduct.get(line.productId) ?? [], parsed.deliveryDate, line.quantity).map(
+              (allocation, allocationIndex) => ({
+                lotId: allocation.lotId,
+                quantity: allocation.quantity,
+                operationKey: `${lineOperationKey}:alloc:${allocationIndex + 1}`,
+              }),
+            )
+          : [{ lotId: line.lotId, quantity: line.quantity, operationKey: lineOperationKey }]
+
+      for (const stockExit of stockExits) {
+        const stockResult = await recordStockMovement(inventoryReq, {
+          operationKey: stockExit.operationKey,
+          movement: {
+            mode: 'exit',
+            productId: line.productId,
+            ...(stockExit.lotId ? { lotId: stockExit.lotId } : {}),
+            operationalDate: parsed.deliveryDate,
+            observation: `Entrega a grupo ${group.id}`,
+            source: 'delivery',
+            quantity: stockExit.quantity,
+            reason: 'delivery',
+          },
         })
+        const movementId = stockResult.movement?.id
+        if (movementId) {
+          await txReq.payload.update({
+            collection: 'stock-movements',
+            data: { referenceId: delivery.id, referenceType: 'delivery' },
+            id: movementId,
+            overrideAccess: true,
+            req: txReq,
+          })
+        }
       }
     }
 
