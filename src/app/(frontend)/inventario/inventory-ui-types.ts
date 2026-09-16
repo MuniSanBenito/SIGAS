@@ -7,8 +7,15 @@ export type InventoryLot = {
   quantity: number
 }
 
+export type InventoryCategory = {
+  id: string
+  isActive: boolean
+  name: string
+}
+
 export type InventoryProduct = {
   category: { id: string; name: string } | string
+  hasMovements: boolean
   id: string
   isActive: boolean
   isLowStock: boolean
@@ -20,6 +27,7 @@ export type InventoryProduct = {
 }
 
 export type InventoryMovement = {
+  correctionOf: string | null
   createdAt: string
   createdBy: string | { id: string; username?: string }
   id: string
@@ -30,11 +38,15 @@ export type InventoryMovement = {
   product: string | { id: string; name?: string }
   quantity: number
   reason: string
+  referenceId: string | null
+  referenceType: string | null
   resultingQuantity: number
+  status: 'active' | 'corrected'
 }
 
 export type InventoryOverview = {
   data: {
+    categories: InventoryCategory[]
     products: InventoryProduct[]
     recentMovements: InventoryMovement[]
     summary: {
@@ -48,5 +60,31 @@ export type InventoryOverview = {
     page: number
     totalItems: number
     totalPages: number
+  }
+}
+
+export type RecipeLineSummary = {
+  productId: string
+  productName: string
+  quantity: number
+}
+
+export type RecipeSummary = {
+  bundleDescription?: string | null
+  bundleId: string
+  bundleName: string
+  capacity: number
+  currentVersion?: {
+    effectiveFrom: string
+    id: string
+    lines: RecipeLineSummary[]
+    version: number
+  }
+  isActive: boolean
+  limitingProduct?: {
+    availableQuantity: number
+    id: string
+    name: string
+    requiredQuantity: number
   }
 }

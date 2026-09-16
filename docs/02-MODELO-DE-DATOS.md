@@ -225,7 +225,7 @@ Libro de movimientos de inventario:
 - `referencia_tipo` y `referencia_id`, por ejemplo una entrega;
 - estado de corrección/auditoría.
 
-Los movimientos pueden ser corregidos por usuarios autorizados, pero la modificación conserva valores anteriores y nuevos en `AUDIT_LOG`.
+Los movimientos pueden ser corregidos por usuarios autorizados mediante un movimiento compensatorio: el registro original permanece en el libro con estado corregido y nunca se reescribe. Los valores anteriores y nuevos quedan en `AUDIT_LOG`.
 
 ## Bolsones y recetas
 

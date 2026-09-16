@@ -11,6 +11,27 @@ export type RecipeProjection = {
   limitingProduct?: { id: string; name: string; availableQuantity: number; requiredQuantity: number }
 }
 
+export type RecipeLineSummary = {
+  productId: string
+  productName: string
+  quantity: number
+}
+
+export type RecipeSummary = {
+  bundleDescription?: string | null
+  bundleId: string
+  bundleName: string
+  capacity: number
+  currentVersion?: {
+    effectiveFrom: string
+    id: string
+    lines: RecipeLineSummary[]
+    version: number
+  }
+  isActive: boolean
+  limitingProduct?: RecipeProjection['limitingProduct']
+}
+
 function relationId(value: unknown): string {
   if (typeof value === 'string') return value
   if (typeof value === 'object' && value !== null && 'id' in value && typeof value.id === 'string') return value.id
@@ -63,6 +84,17 @@ export async function createRecipe(req: InventoryRequest, input: RecipeCommandIn
 
   if (!bundle.isActive) {
     throw new InventoryError('CONFLICT', 'Inactive bundles cannot receive new versions', 409)
+  }
+
+  if (input.bundleId && input.bundleName && input.bundleName !== bundle.name) {
+    await req.payload.update({
+      collection: 'bundles',
+      data: { name: input.bundleName },
+      id: bundle.id,
+      overrideAccess: false,
+      req,
+      user: req.user,
+    })
   }
 
   const products = await Promise.all(input.lines.map((line) => findProduct(req, line.productId)))
@@ -177,6 +209,70 @@ export async function projectRecipe(req: InventoryRequest, versionId: string): P
       requiredQuantity: limiting.required,
     },
   }
+}
+
+export async function listRecipes(req: InventoryRequest): Promise<RecipeSummary[]> {
+  const bundlesResult = await req.payload.find({
+    collection: 'bundles',
+    depth: 0,
+    limit: 1000,
+    overrideAccess: false,
+    req,
+    sort: 'name',
+    user: req.user,
+  })
+  const bundles = bundlesResult.docs as Bundle[]
+
+  return Promise.all(
+    bundles.map(async (bundle) => {
+      const versions = await req.payload.find({
+        collection: 'bundle-versions',
+        depth: 1,
+        limit: 1,
+        overrideAccess: false,
+        req,
+        sort: '-version',
+        user: req.user,
+        where: {
+          and: [{ bundle: { equals: bundle.id } }, { status: { equals: 'current' } }],
+        },
+      })
+      const currentVersion = versions.docs[0] as BundleVersion | undefined
+      let projection: RecipeProjection | undefined
+      let lines: RecipeLineSummary[] = []
+
+      if (currentVersion) {
+        projection = await projectRecipe(req, currentVersion.id)
+        lines = await Promise.all(
+          currentVersion.lines.map(async (line) => {
+            const product = await findProduct(req, relationId(line.product))
+            return {
+              productId: product.id,
+              productName: product.name,
+              quantity: line.quantity,
+            }
+          }),
+        )
+      }
+
+      return {
+        bundleDescription: bundle.description,
+        bundleId: bundle.id,
+        bundleName: bundle.name,
+        capacity: projection?.capacity ?? 0,
+        currentVersion: currentVersion
+          ? {
+              effectiveFrom: currentVersion.effectiveFrom,
+              id: currentVersion.id,
+              lines,
+              version: currentVersion.version,
+            }
+          : undefined,
+        isActive: bundle.isActive,
+        limitingProduct: projection?.limitingProduct,
+      }
+    }),
+  )
 }
 
 export type RecipeRequest = PayloadRequest & { user: User }

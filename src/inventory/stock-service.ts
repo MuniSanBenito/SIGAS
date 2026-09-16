@@ -28,6 +28,15 @@ export type StockCommandResult = {
   replayed: boolean
 }
 
+export type StockCorrectionResult = {
+  balance: StockBalance | null
+  correctedMovement: StockMovement
+  correctionMovement: StockMovement
+  previousQuantity: number
+  resultingQuantity: number
+  replayed: boolean
+}
+
 function relationId(value: unknown): string {
   if (typeof value === 'string') return value
   if (typeof value === 'object' && value !== null && 'id' in value && typeof value.id === 'string') return value.id
@@ -352,6 +361,145 @@ export async function recordStockMovement(req: InventoryRequest, command: StockC
   return {
     balance: savedBalance,
     movement: savedMovement,
+    previousQuantity: result.previousQuantity,
+    resultingQuantity: result.resultingQuantity,
+    replayed: false,
+  }
+}
+
+function originalMovementDelta(movement: StockMovement): number {
+  if (movement.movementType === 'entry') return movement.quantity
+  if (movement.movementType === 'exit') return -movement.quantity
+  if (movement.adjustmentDirection === 'increase') return movement.quantity
+  if (movement.adjustmentDirection === 'decrease') return -movement.quantity
+  throw new InventoryError('INTERNAL_ERROR', 'Unable to determine movement delta', 500)
+}
+
+async function getMovement(req: InventoryRequest, movementId: string): Promise<StockMovement> {
+  try {
+    return (await req.payload.findByID({
+      collection: 'stock-movements',
+      depth: 0,
+      id: movementId,
+      overrideAccess: false,
+      req,
+      user: req.user,
+    })) as StockMovement
+  } catch {
+    throw new InventoryError('NOT_FOUND', 'Movement not found', 404)
+  }
+}
+
+export async function correctStockMovement(
+  req: InventoryRequest,
+  movementId: string,
+  reason: string,
+): Promise<StockCorrectionResult> {
+  const operationKey = `correction-${movementId}`
+  const replayed = await findReplayedMovement(req, operationKey)
+  if (replayed) {
+    const original = replayed.correctionOf
+      ? ((await req.payload.findByID({
+          collection: 'stock-movements',
+          depth: 0,
+          id: relationId(replayed.correctionOf),
+          overrideAccess: true,
+          req,
+        })) as StockMovement)
+      : await getMovement(req, movementId)
+
+    const productId = relationId(replayed.product)
+    const lotId = replayed.lot ? relationId(replayed.lot) : undefined
+    const balance = await findBalance(req, balanceKey(productId, lotId))
+
+    return {
+      balance,
+      correctedMovement: original,
+      correctionMovement: replayed,
+      previousQuantity: replayed.previousQuantity,
+      resultingQuantity: replayed.resultingQuantity,
+      replayed: true,
+    }
+  }
+
+  const movement = await getMovement(req, movementId)
+
+  if (movement.status !== 'active') {
+    throw new InventoryError('CONFLICT', 'Only active movements can be corrected', 409)
+  }
+  if (movement.correctionOf) {
+    throw new InventoryError('CONFLICT', 'Correction movements cannot be corrected again', 409)
+  }
+  if (movement.referenceType === 'delivery') {
+    throw new InventoryError('CONFLICT', 'Delivery movements must be corrected through delivery annulment', 409)
+  }
+
+  const productId = relationId(movement.product)
+  const lotId = movement.lot ? relationId(movement.lot) : undefined
+  const current = await findBalance(req, balanceKey(productId, lotId))
+  const currentQuantity = current?.quantity ?? 0
+  const delta = -originalMovementDelta(movement)
+  const result = calculateStockResult(currentQuantity, delta)
+  const today = new Date().toISOString().slice(0, 10)
+
+  const correctionMovement = (await req.payload.create({
+    collection: 'stock-movements',
+    data: {
+      adjustmentDirection: delta >= 0 ? 'increase' : 'decrease',
+      adjustmentMode: 'manual',
+      correctionOf: movement.id,
+      createdBy: req.user.id,
+      lot: lotId,
+      movementType: 'adjustment',
+      observation: `Corrección de movimiento ${movement.id}`,
+      operationalDate: today,
+      operationKey,
+      previousQuantity: result.previousQuantity,
+      product: productId,
+      quantity: Math.abs(delta),
+      reason,
+      resultingQuantity: result.resultingQuantity,
+      source: 'correction',
+      status: 'active',
+    },
+    draft: false,
+    overrideAccess: true,
+    req,
+  })) as StockMovement
+
+  const correctedMovement = (await req.payload.update({
+    collection: 'stock-movements',
+    data: { status: 'corrected' },
+    id: movement.id,
+    overrideAccess: true,
+    req,
+  })) as StockMovement
+
+  const savedBalance = await saveBalance(req, productId, lotId, result.resultingQuantity, current)
+
+  await auditInventoryAction(req, req.user, {
+    action: 'stock.movement.corrected',
+    after: {
+      balance: result.resultingQuantity,
+      correctionMovementId: correctionMovement.id,
+      originalStatus: 'corrected',
+    },
+    before: {
+      balance: result.previousQuantity,
+      movementId: movement.id,
+      originalStatus: movement.status,
+    },
+    context: { lotId: lotId ?? null, operationKey, productId },
+    reason,
+    result: 'success',
+    targetId: movement.id,
+    targetType: 'stock-movement',
+  })
+
+  return {
+    balance: savedBalance,
+    correctedMovement,
+    correctionMovement,
     previousQuantity: result.previousQuantity,
     resultingQuantity: result.resultingQuantity,
     replayed: false,

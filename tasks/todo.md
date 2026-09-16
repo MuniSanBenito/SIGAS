@@ -63,6 +63,11 @@
   - Verify: `pnpm run test:int` and `pnpm exec playwright test --config=playwright.config.ts --workers=1`.
   - Dependencies: 2.1, 2.2.
 
+- [x] **2.3 Inventory ABM completion**
+  - Acceptance: audited edit/reactivate for products and categories, manual movement correction with compensating ledger entries, recipe list with new-version flow, and inventory workspace UI for all operations.
+  - Verify: `src/inventory/catalog-validation.test.ts`, `tests/int/inventory-catalog.int.spec.ts`, inventory E2E ABM flow, browser check on `/inventario`.
+  - Dependencies: 2.1, 2.2.
+
 ## Phase 3 — Deliveries and reports
 
 - [x] **3.1 Effective mixed deliveries (group destination only)**

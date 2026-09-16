@@ -7,6 +7,7 @@ import { hasAnyRole, type Role } from '@/access/roles'
 import { DashboardShell } from './dashboard-shell'
 
 type ModuleCard = {
+  available?: boolean
   description: string
   href?: string
   icon: (props: { 'aria-hidden'?: boolean | 'true' | 'false'; className?: string; stroke?: number }) => ReactNode
@@ -16,6 +17,7 @@ type ModuleCard = {
 
 const moduleCards: ModuleCard[] = [
   {
+    available: true,
     description: 'Organización de referentes e integrantes del padrón municipal.',
     href: '/grupos',
     icon: IconUsers,
@@ -23,6 +25,7 @@ const moduleCards: ModuleCard[] = [
     title: 'Grupos familiares',
   },
   {
+    available: true,
     description: 'Productos, lotes y movimientos del depósito central.',
     href: '/inventario',
     icon: IconPackages,
@@ -30,6 +33,7 @@ const moduleCards: ModuleCard[] = [
     title: 'Inventario',
   },
   {
+    available: true,
     description: 'Registro de asistencia y entregas efectivas.',
     href: '/entregas',
     icon: IconHeartHandshake,
@@ -64,11 +68,11 @@ export function DashboardHome({ roles }: { roles?: readonly Role[] | null }) {
         <section aria-labelledby="overview-title" className="mt-10">
           <div>
             <h2 className="text-xl font-bold text-content" id="overview-title">Resumen del sistema</h2>
-            <p className="mt-1 text-sm text-content-muted">Módulos que formarán parte del circuito operativo.</p>
+            <p className="mt-1 text-sm text-content-muted">Módulos operativos según tu rol.</p>
           </div>
           {availableModuleCards.length > 0 ? (
             <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {availableModuleCards.map(({ description, href, icon: Icon, title }) => {
+              {availableModuleCards.map(({ available, description, href, icon: Icon, title }) => {
                 const card = (
                   <article className="card h-full border border-line bg-surface shadow-sm" key={title}>
                     <div className="card-body gap-4 p-5">
@@ -76,7 +80,9 @@ export function DashboardHome({ roles }: { roles?: readonly Role[] | null }) {
                         <span className="grid h-11 w-11 place-items-center rounded-box bg-primary/10 text-primary">
                           <Icon aria-hidden="true" className="h-5 w-5" stroke={1.8} />
                         </span>
-                        <span className="badge badge-ghost px-3 py-3 text-xs font-medium text-content-muted">Próximamente</span>
+                        {!available && (
+                          <span className="badge badge-ghost px-3 py-3 text-xs font-medium text-content-muted">Próximamente</span>
+                        )}
                       </div>
                       <div>
                         <h3 className="text-lg font-bold text-content">{title}</h3>
@@ -105,7 +111,7 @@ export function DashboardHome({ roles }: { roles?: readonly Role[] | null }) {
             <div>
               <h2 className="font-bold text-content" id="next-step-title">Tu espacio está listo</h2>
               <p className="mt-1 text-sm leading-6 text-content-muted">
-                Próximamente vas a poder operar cada módulo desde este panel con información centralizada y trazable.
+                Elegí un módulo para comenzar. Cada operación queda registrada con trazabilidad.
               </p>
             </div>
           </div>

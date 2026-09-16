@@ -77,12 +77,68 @@ test('stock user can create a product and record an entry', async ({ page }) => 
   await expect(page.getByRole('status').filter({ hasText: 'Conteo físico registrado correctamente.' })).toBeVisible()
   await expect(page.getByText('4', { exact: true }).first()).toBeVisible()
 
-  await page.getByRole('button', { name: 'Dar de baja producto' }).click()
+  await page.getByRole('button', { name: 'Dar de baja', exact: true }).first().click()
   const deactivateDialog = page.getByRole('dialog')
   await deactivateDialog.getByLabel('Motivo obligatorio').fill('Producto discontinuado para prueba')
   await deactivateDialog.getByRole('button', { name: 'Confirmar baja' }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Producto dado de baja correctamente.' })).toBeVisible()
   await expect(page.getByText('Inactivo', { exact: true })).toBeVisible()
+})
+
+test('stock user can edit catalog items, correct a movement, and version a recipe', async ({ page }) => {
+  await login(page)
+  const abmCategory = `E2E ABM category ${Date.now()}`
+  const abmProduct = `E2E ABM product ${Date.now()}`
+
+  await page.getByRole('button', { name: 'Nueva categoría' }).click()
+  await page.getByRole('dialog').getByLabel('Nombre').fill(abmCategory)
+  await page.getByRole('dialog').getByRole('button', { name: 'Crear categoría' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Categoría creada correctamente.' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Nuevo producto' }).click()
+  const productDialog = page.getByRole('dialog')
+  await productDialog.getByLabel('Nombre').fill(abmProduct)
+  await productDialog.getByLabel('Categoría').selectOption({ label: abmCategory })
+  await productDialog.getByRole('button', { name: 'Crear producto' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Producto creado correctamente.' })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Cargar entrada' }).click()
+  const entryDialog = page.getByRole('dialog')
+  await entryDialog.getByLabel('Producto').selectOption({ label: abmProduct })
+  await entryDialog.getByLabel('Cantidad').fill('5')
+  await entryDialog.getByRole('button', { name: 'Confirmar operación' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Entrada registrada correctamente.' })).toBeVisible()
+
+  await page.getByRole('button', { name: abmCategory, exact: true }).click()
+  await page.getByRole('dialog').getByLabel('Nombre').fill(`${abmCategory} editada`)
+  await page.getByRole('dialog').getByRole('button', { name: 'Guardar cambios' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Categoría actualizada correctamente.' })).toBeVisible()
+
+  await page.getByRole('heading', { name: abmProduct }).locator('xpath=ancestor::article').getByRole('button', { name: 'Editar' }).click()
+  await page.getByRole('dialog').getByLabel('Stock mínimo').fill('1')
+  await page.getByRole('dialog').getByRole('button', { name: 'Guardar cambios' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Producto actualizado correctamente.' })).toBeVisible()
+
+  await page.getByRole('tab', { name: 'Movimientos' }).click()
+  await page.getByRole('button', { name: 'Anular' }).first().click()
+  await page.getByRole('dialog').getByLabel('Motivo obligatorio').fill('Entrada registrada por error')
+  await page.getByRole('dialog').getByRole('button', { name: 'Confirmar anulación' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Movimiento anulado correctamente.' })).toBeVisible()
+  await expect(page.getByText('Anulado').first()).toBeVisible()
+
+  await page.getByRole('tab', { name: 'Recetas' }).click()
+  await page.getByRole('button', { name: 'Nueva receta' }).click()
+  const recipeDialog = page.getByRole('dialog')
+  const bundleName = `E2E bundle ${Date.now()}`
+  await recipeDialog.getByLabel('Nombre del bolsón').fill(bundleName)
+  await recipeDialog.getByRole('button', { name: 'Guardar versión' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Receta versionada correctamente.' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: bundleName })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Nueva versión' }).click()
+  await recipeDialog.getByRole('button', { name: 'Guardar nueva versión' }).click()
+  await expect(page.getByRole('status').filter({ hasText: 'Nueva versión de receta guardada correctamente.' })).toBeVisible()
+  await expect(page.getByText('Versión 2')).toBeVisible()
 })
 
 test('inventory remains usable without horizontal overflow at supported widths', async ({ page }) => {

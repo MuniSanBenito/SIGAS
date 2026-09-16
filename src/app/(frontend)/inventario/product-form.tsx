@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
+
+import type { InventoryProduct } from './inventory-ui-types'
 
 type Category = { id: string; name: string }
 
@@ -8,15 +10,28 @@ type ProductFormProps = {
   categories: Category[]
   onCancel: () => void
   onSaved: (message: string) => Promise<void>
+  product?: InventoryProduct | null
 }
 
-export function ProductForm({ categories, onCancel, onSaved }: ProductFormProps) {
-  const [name, setName] = useState('')
-  const [category, setCategory] = useState(categories[0]?.id ?? '')
-  const [minimumStock, setMinimumStock] = useState('0')
-  const [tracksLotExpiration, setTracksLotExpiration] = useState(false)
+export function ProductForm({ categories, onCancel, onSaved, product }: ProductFormProps) {
+  const editing = Boolean(product)
+  const [name, setName] = useState(product?.name ?? '')
+  const [category, setCategory] = useState(
+    typeof product?.category === 'object' ? product.category.id : product?.category ?? categories[0]?.id ?? '',
+  )
+  const [minimumStock, setMinimumStock] = useState(String(product?.minimumStock ?? 0))
+  const [tracksLotExpiration, setTracksLotExpiration] = useState(product?.tracksLotExpiration ?? false)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const lotLocked = editing && (product?.hasMovements ?? false)
+
+  useEffect(() => {
+    if (!product) return
+    setName(product.name)
+    setCategory(typeof product.category === 'object' ? product.category.id : product.category)
+    setMinimumStock(String(product.minimumStock))
+    setTracksLotExpiration(product.tracksLotExpiration)
+  }, [product])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -24,23 +39,26 @@ export function ProductForm({ categories, onCancel, onSaved }: ProductFormProps)
     setIsSubmitting(true)
 
     try {
-      const response = await fetch('/api/products', {
-        body: JSON.stringify({
-          category,
-          isActive: true,
-          minimumStock: Number(minimumStock),
-          name: name.trim(),
-          tracksLotExpiration,
-        }),
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        method: 'POST',
-      })
+      const payload = {
+        category: category,
+        minimumStock: Number(minimumStock),
+        name: name.trim(),
+        ...(lotLocked ? {} : { tracksLotExpiration }),
+      }
+      const response = await fetch(
+        editing ? `/api/inventory/products/${product?.id}` : '/api/inventory/products',
+        {
+          body: JSON.stringify(payload),
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          method: 'POST',
+        },
+      )
       const body = await response.json().catch(() => null)
-      if (!response.ok) throw new Error(body?.errors?.[0]?.message ?? 'No se pudo crear el producto.')
-      await onSaved('Producto creado correctamente.')
+      if (!response.ok) throw new Error(body?.error?.message ?? body?.errors?.[0]?.message ?? 'No se pudo guardar el producto.')
+      await onSaved(editing ? 'Producto actualizado correctamente.' : 'Producto creado correctamente.')
     } catch (submissionError) {
-      setError(submissionError instanceof Error ? submissionError.message : 'No se pudo crear el producto.')
+      setError(submissionError instanceof Error ? submissionError.message : 'No se pudo guardar el producto.')
     } finally {
       setIsSubmitting(false)
     }
@@ -49,7 +67,7 @@ export function ProductForm({ categories, onCancel, onSaved }: ProductFormProps)
   return (
     <form className="space-y-5" onSubmit={handleSubmit}>
       <div>
-        <h2 className="text-xl font-bold text-content">Nuevo producto</h2>
+        <h2 className="text-xl font-bold text-content">{editing ? 'Editar producto' : 'Nuevo producto'}</h2>
         <p className="mt-1 text-sm text-content-muted">Definí cómo se va a controlar dentro del depósito.</p>
       </div>
 
@@ -72,19 +90,21 @@ export function ProductForm({ categories, onCancel, onSaved }: ProductFormProps)
       </div>
 
       <label className="flex min-h-12 items-start gap-3 rounded-box border border-line bg-surface-alt p-4">
-        <input checked={tracksLotExpiration} className="checkbox checkbox-primary mt-0.5" onChange={(event) => setTracksLotExpiration(event.target.checked)} type="checkbox" />
+        <input checked={tracksLotExpiration} className="checkbox checkbox-primary mt-0.5" disabled={lotLocked} onChange={(event) => setTracksLotExpiration(event.target.checked)} type="checkbox" />
         <span>
           <span className="block text-sm font-semibold text-content">Controlar lote y vencimiento</span>
-          <span className="mt-1 block text-sm text-content-muted">Esta configuración queda fija después del primer movimiento.</span>
+          <span className="mt-1 block text-sm text-content-muted">
+            {lotLocked ? 'Esta configuración queda fija después del primer movimiento.' : 'Podés cambiarla solo antes del primer movimiento.'}
+          </span>
         </span>
       </label>
 
-      {categories.length === 0 && <p className="rounded-box border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning" role="alert">Primero necesitás crear una categoría desde Payload Admin.</p>}
+      {categories.length === 0 && <p className="rounded-box border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning" role="alert">Primero necesitás crear una categoría.</p>}
       {error && <p className="rounded-box border border-error/30 bg-error/10 px-4 py-3 text-sm text-error" role="alert">{error}</p>}
 
       <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <button className="btn btn-ghost" onClick={onCancel} type="button">Cancelar</button>
-        <button className="btn btn-primary" disabled={isSubmitting || !category} type="submit">{isSubmitting ? 'Guardando…' : 'Crear producto'}</button>
+        <button className="btn btn-primary" disabled={isSubmitting || !category} type="submit">{isSubmitting ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear producto'}</button>
       </div>
     </form>
   )

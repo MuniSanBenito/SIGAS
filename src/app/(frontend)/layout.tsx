@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Script from 'next/script'
 import React from 'react'
 
 import './styles.css'
@@ -28,14 +29,14 @@ export default function RootLayout(props: { children: React.ReactNode }) {
 
   return (
     <html data-theme="sanbenito-light" lang="es" suppressHydrationWarning>
-      <head>
-        <script
+      <body>
+        <Script
           dangerouslySetInnerHTML={{ __html: themeScript }}
-          suppressHydrationWarning
-          type={typeof window === 'undefined' ? 'text/javascript' : 'text/plain'}
+          id="sigas-theme-init"
+          strategy="beforeInteractive"
         />
-      </head>
-      <body>{children}</body>
+        {children}
+      </body>
     </html>
   )
 }
