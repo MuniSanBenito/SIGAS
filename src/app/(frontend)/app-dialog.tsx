@@ -31,7 +31,9 @@ export function AppDialog({
   const titleId = useId()
   const descriptionId = useId()
 
-  onCloseRef.current = onClose
+  useLayoutEffect(() => {
+    onCloseRef.current = onClose
+  })
 
   useLayoutEffect(() => {
     const node = dialogRef.current

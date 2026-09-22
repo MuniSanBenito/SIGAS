@@ -462,6 +462,7 @@ export async function correctStockMovement(
       source: 'correction',
       status: 'active',
     },
+    depth: 0,
     draft: false,
     overrideAccess: true,
     req,
@@ -470,6 +471,7 @@ export async function correctStockMovement(
   const correctedMovement = (await req.payload.update({
     collection: 'stock-movements',
     data: { status: 'corrected' },
+    depth: 0,
     id: movement.id,
     overrideAccess: true,
     req,

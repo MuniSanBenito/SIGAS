@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 
 import { AppDialogBody, AppDialogFooter } from '../app-dialog'
 import type { InventoryProduct, RecipeSummary } from './inventory-ui-types'
@@ -26,14 +26,6 @@ export function RecipeForm({ onCancel, onSaved, products, recipe }: RecipeFormPr
   )
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-
-  useEffect(() => {
-    if (!recipe) return
-    setBundleName(recipe.bundleName)
-    if (recipe.currentVersion) {
-      setLines(recipe.currentVersion.lines.map((line) => ({ productId: line.productId, quantity: String(line.quantity) })))
-    }
-  }, [recipe])
 
   function updateLine(index: number, field: keyof RecipeLine, value: string) {
     setLines((current) => current.map((line, lineIndex) => lineIndex === index ? { ...line, [field]: value } : line))

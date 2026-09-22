@@ -14,11 +14,13 @@ import type { KinshipRelation, User } from '@/payload-types'
 
 vi.mock('@/integrations/padron/san-benito-client', () => ({
   getContribuyenteById: vi.fn(async (id: string) => ({
-    id,
-    nombre: id === 'contrib-1' ? 'Ana Referente' : 'Bruno Hijo',
-    numero_documento: id === 'contrib-1' ? '30111222' : '30999888',
-    domicilio: 'Calle 1',
-    barrio: 'Centro',
+    doc: {
+      id,
+      nombre: id === 'contrib-1' ? 'Ana Referente' : 'Bruno Hijo',
+      numero_documento: id === 'contrib-1' ? '30111222' : '30999888',
+      domicilio: 'Calle 1',
+      barrio: 'Centro',
+    },
   })),
 }))
 

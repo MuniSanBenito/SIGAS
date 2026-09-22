@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 
 import { AppDialogBody, AppDialogFooter } from '../app-dialog'
 import type { InventoryCategory } from './inventory-ui-types'
@@ -17,12 +17,6 @@ export function CategoryForm({ category, onCancel, onSaved }: CategoryFormProps)
   const [isActive, setIsActive] = useState(category?.isActive ?? true)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-
-  useEffect(() => {
-    if (!category) return
-    setName(category.name)
-    setIsActive(category.isActive)
-  }, [category])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

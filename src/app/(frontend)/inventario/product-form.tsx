@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 
 import { AppDialogBody, AppDialogFooter } from '../app-dialog'
 import type { InventoryProduct } from './inventory-ui-types'
@@ -25,14 +25,6 @@ export function ProductForm({ categories, onCancel, onSaved, product }: ProductF
   const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const lotLocked = editing && (product?.hasMovements ?? false)
-
-  useEffect(() => {
-    if (!product) return
-    setName(product.name)
-    setCategory(typeof product.category === 'object' ? product.category.id : product.category)
-    setMinimumStock(String(product.minimumStock))
-    setTracksLotExpiration(product.tracksLotExpiration)
-  }, [product])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()

@@ -204,17 +204,19 @@ export function ContribuyentesWorkspace({
         >
           <AppDialogBody>
             <div className="grid gap-4 sm:grid-cols-2">
-              {([
-                { key: 'nombre', label: 'Nombre' },
-                { key: 'apellido', label: 'Apellido' },
-                { key: 'dni', label: 'DNI' },
-                { key: 'cuit', label: 'CUIT' },
-                { key: 'telefono', label: 'Teléfono' },
-                { key: 'email', label: 'Email', type: 'email' },
-                { key: 'direccion', label: 'Dirección' },
-                { key: 'barrio', label: 'Barrio' },
-                { key: 'fechaNacimiento', label: 'Fecha de nacimiento', type: 'date' },
-              ] as const).map(({ key, label, type }) => (
+              {(
+                [
+                  { key: 'nombre', label: 'Nombre' },
+                  { key: 'apellido', label: 'Apellido' },
+                  { key: 'dni', label: 'DNI' },
+                  { key: 'cuit', label: 'CUIT' },
+                  { key: 'telefono', label: 'Teléfono' },
+                  { key: 'email', label: 'Email', type: 'email' },
+                  { key: 'direccion', label: 'Dirección' },
+                  { key: 'barrio', label: 'Barrio' },
+                  { key: 'fechaNacimiento', label: 'Fecha de nacimiento', type: 'date' },
+                ] as readonly { key: keyof FormState; label: string; type?: 'email' | 'date' }[]
+              ).map(({ key, label, type }) => (
                 <label className="form-control gap-1" key={key}>
                   <span className="label-text font-semibold text-content">
                     {label}
