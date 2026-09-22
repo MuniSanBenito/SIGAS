@@ -26,7 +26,7 @@ export const roleOptions: { label: string; value: Role }[] = [
 const moduleRoles: Record<ModuleKey, readonly Role[]> = {
   groups: ['admin', 'administracion'],
   inventory: ['admin', 'stock'],
-  deliveries: ['admin'],
+  deliveries: ['admin', 'administracion'],
 }
 
 function isRole(value: unknown): value is Role {
@@ -62,7 +62,7 @@ export const groupOperator = ({ req: { user } }: AccessUserArgs): boolean =>
   canAccessModule(user, 'groups')
 
 export const deliveryOperator = ({ req: { user } }: AccessUserArgs): boolean =>
-  hasRole(user, 'admin')
+  canAccessModule(user, 'deliveries')
 
 export const authenticated = ({ req: { user } }: AccessUserArgs): boolean => Boolean(user)
 

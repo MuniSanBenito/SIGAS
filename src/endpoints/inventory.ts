@@ -20,6 +20,8 @@ import {
 import { InventoryError, inventoryErrorResponse } from '../inventory/errors'
 import { createRecipe, listRecipes, projectRecipe } from '../inventory/recipe-service'
 import { parseRecipeCommand } from '../inventory/recipe-validation'
+import { parseStockBatchCommand } from '../inventory/batch-validation'
+import { inventoryErrorMessage } from '../inventory/labels'
 import { correctStockMovement, recordStockMovement, type InventoryRequest } from '../inventory/stock-service'
 import { parseStockCommand } from '../inventory/validation'
 
@@ -68,6 +70,58 @@ function mapMovement(movement: StockMovement) {
     referenceType: movement.referenceType ?? null,
     resultingQuantity: movement.resultingQuantity,
     status: movement.status,
+  }
+}
+
+async function stockMovementBatchEndpoint(req: InventoryRequest): Promise<Response> {
+  try {
+    authenticatedInventoryUser(req)
+    const command = parseStockBatchCommand(await requestBody(req))
+    const results = []
+
+    for (const line of command.lines) {
+      try {
+        const result = await recordStockMovement(req, {
+          movement: line.movement,
+          operationKey: `${command.batchOperationKey}:${line.lineKey}`,
+        })
+        results.push({
+          lineKey: line.lineKey,
+          ok: true,
+          previousQuantity: result.previousQuantity,
+          resultingQuantity: result.resultingQuantity,
+          replayed: result.replayed,
+        })
+      } catch (error) {
+        const message =
+          error instanceof InventoryError
+            ? inventoryErrorMessage(error.message)
+            : 'No se pudo completar. Probá de nuevo.'
+        results.push({
+          code: error instanceof InventoryError ? error.code : 'INTERNAL_ERROR',
+          lineKey: line.lineKey,
+          message,
+          ok: false,
+        })
+      }
+    }
+
+    const succeeded = results.filter((result) => result.ok).length
+    const failed = results.length - succeeded
+
+    return Response.json({
+      data: {
+        failed,
+        results,
+        succeeded,
+      },
+      meta: {
+        batchOperationKey: command.batchOperationKey,
+        total: results.length,
+      },
+    })
+  } catch (error) {
+    return inventoryErrorResponse(error)
   }
 }
 
@@ -366,6 +420,11 @@ export const inventoryEndpoints: Endpoint[] = [
     handler: (req) => stockMovementEndpoint(req as InventoryRequest),
     method: 'post',
     path: '/inventory/movements',
+  },
+  {
+    handler: (req) => stockMovementBatchEndpoint(req as InventoryRequest),
+    method: 'post',
+    path: '/inventory/movements/batch',
   },
   {
     handler: (req) => correctMovementEndpoint(req as InventoryRequest),

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react'
 
+import { AppDialogBody, AppDialogFooter } from '../app-dialog'
 import type { InventoryCategory } from './inventory-ui-types'
 
 type CategoryFormProps = {
@@ -48,26 +49,26 @@ export function CategoryForm({ category, onCancel, onSaved }: CategoryFormProps)
   }
 
   return (
-    <form className="space-y-5" onSubmit={handleSubmit}>
-      <div>
-        <h2 className="text-xl font-bold text-content">{editing ? 'Editar categoría' : 'Nueva categoría'}</h2>
-        <p className="mt-1 text-sm text-content-muted">Agrupá productos para encontrarlos más rápido.</p>
-      </div>
-      <label className="space-y-2">
-        <span className="text-sm font-semibold text-content">Nombre</span>
-        <input className="input input-bordered h-12 w-full bg-surface text-content" onChange={(event) => setName(event.target.value)} required value={name} />
-      </label>
-      {editing && (
-        <label className="flex min-h-12 items-center gap-3 rounded-box border border-line bg-surface-alt p-4">
-          <input checked={isActive} className="checkbox checkbox-primary" onChange={(event) => setIsActive(event.target.checked)} type="checkbox" />
-          <span className="text-sm font-semibold text-content">Categoría activa</span>
-        </label>
-      )}
-      {error && <p className="rounded-box border border-error/30 bg-error/10 px-4 py-3 text-sm text-error" role="alert">{error}</p>}
-      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-        <button className="btn btn-ghost" onClick={onCancel} type="button">Cancelar</button>
-        <button className="btn btn-primary" disabled={isSubmitting} type="submit">{isSubmitting ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear categoría'}</button>
-      </div>
+    <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSubmit}>
+      <AppDialogBody>
+        <div className="space-y-5">
+          <label className="space-y-2">
+            <span className="text-sm font-semibold text-content">Nombre</span>
+            <input className="input input-bordered h-12 w-full bg-surface text-content" onChange={(event) => setName(event.target.value)} required value={name} />
+          </label>
+          {editing && (
+            <label className="flex min-h-12 items-center gap-3 rounded-box border border-line bg-surface-alt p-4">
+              <input checked={isActive} className="checkbox checkbox-primary" onChange={(event) => setIsActive(event.target.checked)} type="checkbox" />
+              <span className="text-sm font-semibold text-content">Categoría activa</span>
+            </label>
+          )}
+          {error && <p className="rounded-box border border-error/30 bg-error/10 px-4 py-3 text-sm text-error" role="alert">{error}</p>}
+        </div>
+      </AppDialogBody>
+      <AppDialogFooter>
+        <button className="btn btn-ghost min-h-11" onClick={onCancel} type="button">Cancelar</button>
+        <button className="btn btn-primary min-h-11" disabled={isSubmitting} type="submit">{isSubmitting ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear categoría'}</button>
+      </AppDialogFooter>
     </form>
   )
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { canAccessModule, getRoles, hasAnyRole, hasRole, inventoryOperator } from './roles'
+import { canAccessModule, deliveryOperator, getRoles, hasAnyRole, hasRole, inventoryOperator } from './roles'
 
 describe('role permissions', () => {
   it('recognizes a role assigned to the user', () => {
@@ -15,6 +15,7 @@ describe('role permissions', () => {
     expect(hasAnyRole(user, ['administracion'])).toBe(true)
     expect(canAccessModule(user, 'inventory')).toBe(true)
     expect(canAccessModule(user, 'groups')).toBe(true)
+    expect(canAccessModule(user, 'deliveries')).toBe(true)
   })
 
   it('gives the administrator access to every current module', () => {
@@ -22,13 +23,23 @@ describe('role permissions', () => {
 
     expect(canAccessModule(user, 'inventory')).toBe(true)
     expect(canAccessModule(user, 'groups')).toBe(true)
+    expect(canAccessModule(user, 'deliveries')).toBe(true)
   })
 
   it('does not grant module access to users without the corresponding role', () => {
     expect(canAccessModule({ roles: ['stock'] }, 'groups')).toBe(false)
     expect(canAccessModule({ roles: ['administracion'] }, 'groups')).toBe(true)
     expect(canAccessModule({ roles: ['administracion'] }, 'inventory')).toBe(false)
+    expect(canAccessModule({ roles: ['administracion'] }, 'deliveries')).toBe(true)
+    expect(canAccessModule({ roles: ['stock'] }, 'deliveries')).toBe(false)
     expect(canAccessModule({ roles: [] }, 'inventory')).toBe(false)
+  })
+
+  it('allows delivery operators through the delivery access guard', () => {
+    expect(deliveryOperator({ req: { user: { roles: ['administracion'] } } })).toBe(true)
+    expect(deliveryOperator({ req: { user: { roles: ['admin'] } } })).toBe(true)
+    expect(deliveryOperator({ req: { user: { roles: ['stock'] } } })).toBe(false)
+    expect(deliveryOperator({ req: { user: null } })).toBe(false)
   })
 
   it('allows only inventory operators through the inventory access guard', () => {

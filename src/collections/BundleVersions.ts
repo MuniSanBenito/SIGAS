@@ -5,6 +5,10 @@ import { validatePositiveInteger } from '../inventory/field-validation'
 
 export const BundleVersions: CollectionConfig = {
   slug: 'bundle-versions',
+  labels: {
+    plural: 'Versiones de bolsón',
+    singular: 'Versión de bolsón',
+  },
   admin: {
     defaultColumns: ['bundle', 'version', 'status', 'effectiveFrom', 'createdBy'],
     useAsTitle: 'version',

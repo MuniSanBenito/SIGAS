@@ -5,6 +5,10 @@ import { validateNonNegativeInteger, validateRequiredText } from '../inventory/f
 
 export const StockBalances: CollectionConfig = {
   slug: 'stock-balances',
+  labels: {
+    plural: 'Saldos',
+    singular: 'Saldo',
+  },
   admin: {
     defaultColumns: ['product', 'lot', 'quantity', 'updatedAt'],
     useAsTitle: 'balanceKey',

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react'
 
+import { AppDialogBody, AppDialogFooter } from '../app-dialog'
 import type { InventoryProduct } from './inventory-ui-types'
 
 type Category = { id: string; name: string }
@@ -65,47 +66,45 @@ export function ProductForm({ categories, onCancel, onSaved, product }: ProductF
   }
 
   return (
-    <form className="space-y-5" onSubmit={handleSubmit}>
-      <div>
-        <h2 className="text-xl font-bold text-content">{editing ? 'Editar producto' : 'Nuevo producto'}</h2>
-        <p className="mt-1 text-sm text-content-muted">Definí cómo se va a controlar dentro del depósito.</p>
-      </div>
+    <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSubmit}>
+      <AppDialogBody>
+        <div className="space-y-5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="space-y-2 sm:col-span-2">
+              <span className="text-sm font-semibold text-content">Nombre</span>
+              <input className="input input-bordered h-12 w-full bg-surface text-content" onChange={(event) => setName(event.target.value)} required value={name} />
+            </label>
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-content">Categoría</span>
+              <select className="select select-bordered h-12 w-full bg-surface text-content" onChange={(event) => setCategory(event.target.value)} required value={category}>
+                <option disabled value="">Seleccioná una categoría</option>
+                {categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              </select>
+            </label>
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-content">Stock mínimo</span>
+              <input className="input input-bordered h-12 w-full bg-surface text-content" min="0" onChange={(event) => setMinimumStock(event.target.value)} required type="number" value={minimumStock} />
+            </label>
+          </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="space-y-2 sm:col-span-2">
-          <span className="text-sm font-semibold text-content">Nombre</span>
-          <input className="input input-bordered h-12 w-full bg-surface text-content" onChange={(event) => setName(event.target.value)} required value={name} />
-        </label>
-        <label className="space-y-2">
-          <span className="text-sm font-semibold text-content">Categoría</span>
-          <select className="select select-bordered h-12 w-full bg-surface text-content" onChange={(event) => setCategory(event.target.value)} required value={category}>
-            <option disabled value="">Seleccioná una categoría</option>
-            {categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select>
-        </label>
-        <label className="space-y-2">
-          <span className="text-sm font-semibold text-content">Stock mínimo</span>
-          <input className="input input-bordered h-12 w-full bg-surface text-content" min="0" onChange={(event) => setMinimumStock(event.target.value)} required type="number" value={minimumStock} />
-        </label>
-      </div>
+          <label className="flex min-h-12 items-start gap-3 rounded-box border border-line bg-surface-alt p-4">
+            <input checked={tracksLotExpiration} className="checkbox checkbox-primary mt-0.5" disabled={lotLocked} onChange={(event) => setTracksLotExpiration(event.target.checked)} type="checkbox" />
+            <span>
+              <span className="block text-sm font-semibold text-content">Controlar lote y vencimiento</span>
+              <span className="mt-1 block text-sm text-content-muted">
+                {lotLocked ? 'Esta configuración queda fija después del primer movimiento.' : 'Podés cambiarla solo antes del primer movimiento.'}
+              </span>
+            </span>
+          </label>
 
-      <label className="flex min-h-12 items-start gap-3 rounded-box border border-line bg-surface-alt p-4">
-        <input checked={tracksLotExpiration} className="checkbox checkbox-primary mt-0.5" disabled={lotLocked} onChange={(event) => setTracksLotExpiration(event.target.checked)} type="checkbox" />
-        <span>
-          <span className="block text-sm font-semibold text-content">Controlar lote y vencimiento</span>
-          <span className="mt-1 block text-sm text-content-muted">
-            {lotLocked ? 'Esta configuración queda fija después del primer movimiento.' : 'Podés cambiarla solo antes del primer movimiento.'}
-          </span>
-        </span>
-      </label>
-
-      {categories.length === 0 && <p className="rounded-box border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning" role="alert">Primero necesitás crear una categoría.</p>}
-      {error && <p className="rounded-box border border-error/30 bg-error/10 px-4 py-3 text-sm text-error" role="alert">{error}</p>}
-
-      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-        <button className="btn btn-ghost" onClick={onCancel} type="button">Cancelar</button>
-        <button className="btn btn-primary" disabled={isSubmitting || !category} type="submit">{isSubmitting ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear producto'}</button>
-      </div>
+          {categories.length === 0 && <p className="rounded-box border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning" role="alert">Primero necesitás crear una categoría.</p>}
+          {error && <p className="rounded-box border border-error/30 bg-error/10 px-4 py-3 text-sm text-error" role="alert">{error}</p>}
+        </div>
+      </AppDialogBody>
+      <AppDialogFooter>
+        <button className="btn btn-ghost min-h-11" onClick={onCancel} type="button">Cancelar</button>
+        <button className="btn btn-primary min-h-11" disabled={isSubmitting || !category} type="submit">{isSubmitting ? 'Guardando…' : editing ? 'Guardar cambios' : 'Crear producto'}</button>
+      </AppDialogFooter>
     </form>
   )
 }

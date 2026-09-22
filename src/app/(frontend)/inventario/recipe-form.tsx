@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react'
 
+import { AppDialogBody, AppDialogFooter } from '../app-dialog'
 import type { InventoryProduct, RecipeSummary } from './inventory-ui-types'
 
 type RecipeLine = { productId: string; quantity: string }
@@ -65,7 +66,7 @@ export function RecipeForm({ onCancel, onSaved, products, recipe }: RecipeFormPr
       })
       const body = await response.json().catch(() => null)
       if (!response.ok) throw new Error(body?.error?.message ?? 'No se pudo guardar la receta.')
-      await onSaved(editingVersion ? 'Nueva versión de receta guardada correctamente.' : 'Receta versionada correctamente.')
+      await onSaved(editingVersion ? 'Composición del bolsón actualizada correctamente.' : 'Bolsón creado correctamente.')
     } catch (submissionError) {
       setError(submissionError instanceof Error ? submissionError.message : 'No se pudo guardar la receta.')
     } finally {
@@ -74,45 +75,43 @@ export function RecipeForm({ onCancel, onSaved, products, recipe }: RecipeFormPr
   }
 
   return (
-    <form className="space-y-5" onSubmit={handleSubmit}>
-      <div>
-        <h2 className="text-xl font-bold text-content">
-          {editingVersion ? `Nueva versión · ${recipe?.bundleName}` : 'Nueva receta de bolsón'}
-        </h2>
-        <p className="mt-1 text-sm text-content-muted">Cada guardado crea una versión inmutable. La anterior queda en el historial.</p>
-      </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="space-y-2">
-          <span className="text-sm font-semibold text-content">Nombre del bolsón</span>
-          <input className="input input-bordered h-12 w-full bg-surface text-content" onChange={(event) => setBundleName(event.target.value)} required value={bundleName} />
-        </label>
-        <label className="space-y-2">
-          <span className="text-sm font-semibold text-content">Vigente desde</span>
-          <input className="input input-bordered h-12 w-full bg-surface text-content" onChange={(event) => setEffectiveFrom(event.target.value)} required type="date" value={effectiveFrom} />
-        </label>
-      </div>
-      <fieldset className="space-y-3">
-        <legend className="text-sm font-semibold text-content">Productos de la receta</legend>
-        {lines.map((line, index) => (
-          <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_8rem_auto]" key={`${index}-${line.productId}`}>
-            <label className="sr-only" htmlFor={`recipe-product-${index}`}>Producto de la línea {index + 1}</label>
-            <select className="select select-bordered h-12 w-full bg-surface text-content" id={`recipe-product-${index}`} onChange={(event) => updateLine(index, 'productId', event.target.value)} required value={line.productId}>
-              <option disabled value="">Seleccioná un producto</option>
-              {activeProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
-            </select>
-            <label className="sr-only" htmlFor={`recipe-quantity-${index}`}>Cantidad de la línea {index + 1}</label>
-            <input className="input input-bordered h-12 w-full bg-surface text-content" id={`recipe-quantity-${index}`} min="1" onChange={(event) => updateLine(index, 'quantity', event.target.value)} required type="number" value={line.quantity} />
-            <button aria-label={`Quitar producto ${index + 1}`} className="btn btn-ghost h-12" disabled={lines.length === 1} onClick={() => removeLine(index)} type="button">Quitar</button>
+    <form className="flex min-h-0 flex-1 flex-col" onSubmit={handleSubmit}>
+      <AppDialogBody>
+        <div className="space-y-5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-content">Nombre del bolsón</span>
+              <input className="input input-bordered h-12 w-full bg-surface text-content" onChange={(event) => setBundleName(event.target.value)} required value={bundleName} />
+            </label>
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-content">Vigente desde</span>
+              <input className="input input-bordered h-12 w-full bg-surface text-content" onChange={(event) => setEffectiveFrom(event.target.value)} required type="date" value={effectiveFrom} />
+            </label>
           </div>
-        ))}
-      </fieldset>
-      <button className="btn btn-outline btn-sm" disabled={activeProducts.length === 0} onClick={addLine} type="button">Agregar producto</button>
-      {activeProducts.length === 0 && <p className="rounded-box border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning" role="alert">Necesitás al menos un producto activo.</p>}
-      {error && <p className="rounded-box border border-error/30 bg-error/10 px-4 py-3 text-sm text-error" role="alert">{error}</p>}
-      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-        <button className="btn btn-ghost" onClick={onCancel} type="button">Cancelar</button>
-        <button className="btn btn-primary" disabled={isSubmitting || activeProducts.length === 0} type="submit">{isSubmitting ? 'Guardando…' : editingVersion ? 'Guardar nueva versión' : 'Guardar versión'}</button>
-      </div>
+          <fieldset className="space-y-3">
+            <legend className="text-sm font-semibold text-content">Productos de la receta</legend>
+            {lines.map((line, index) => (
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_8rem_auto]" key={`${index}-${line.productId}`}>
+                <label className="sr-only" htmlFor={`recipe-product-${index}`}>Producto de la línea {index + 1}</label>
+                <select className="select select-bordered h-12 w-full bg-surface text-content" id={`recipe-product-${index}`} onChange={(event) => updateLine(index, 'productId', event.target.value)} required value={line.productId}>
+                  <option disabled value="">Seleccioná un producto</option>
+                  {activeProducts.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
+                </select>
+                <label className="sr-only" htmlFor={`recipe-quantity-${index}`}>Cantidad de la línea {index + 1}</label>
+                <input className="input input-bordered h-12 w-full bg-surface text-content" id={`recipe-quantity-${index}`} min="1" onChange={(event) => updateLine(index, 'quantity', event.target.value)} required type="number" value={line.quantity} />
+                <button aria-label={`Quitar producto ${index + 1}`} className="btn btn-ghost h-12" disabled={lines.length === 1} onClick={() => removeLine(index)} type="button">Quitar</button>
+              </div>
+            ))}
+          </fieldset>
+          <button className="btn btn-outline btn-sm" disabled={activeProducts.length === 0} onClick={addLine} type="button">Agregar producto</button>
+          {activeProducts.length === 0 && <p className="rounded-box border border-warning/30 bg-warning/10 px-4 py-3 text-sm text-warning" role="alert">Necesitás al menos un producto activo.</p>}
+          {error && <p className="rounded-box border border-error/30 bg-error/10 px-4 py-3 text-sm text-error" role="alert">{error}</p>}
+        </div>
+      </AppDialogBody>
+      <AppDialogFooter>
+        <button className="btn btn-ghost min-h-11" onClick={onCancel} type="button">Cancelar</button>
+        <button className="btn btn-primary min-h-11" disabled={isSubmitting || activeProducts.length === 0} type="submit">{isSubmitting ? 'Guardando…' : editingVersion ? 'Guardar cambios' : 'Crear bolsón'}</button>
+      </AppDialogFooter>
     </form>
   )
 }

@@ -2,7 +2,7 @@ import type { PayloadRequest } from 'payload'
 
 import { getContribuyenteById } from '@/integrations/padron/san-benito-client'
 import type { Contribuyente } from '@/lib/contribuyente-map'
-import { getRoles, hasRole } from '../access/roles'
+import { canAccessModule, getRoles } from '../access/roles'
 import { recordStockMovement, type InventoryRequest } from '../inventory/stock-service'
 import type {
   BundleVersion,
@@ -91,10 +91,10 @@ function allocateLotsFEFO(
   return allocations
 }
 
-function assertAdmin(req: DeliveryRequest): User {
+function assertDeliveryOperator(req: DeliveryRequest): User {
   if (!req.user) throw new DeliveryError('UNAUTHENTICATED', 'La sesión es obligatoria.', 401)
-  if (!hasRole(req.user, 'admin')) {
-    throw new DeliveryError('FORBIDDEN', 'Solo el Administrador puede confirmar entregas.', 403)
+  if (!canAccessModule(req.user, 'deliveries')) {
+    throw new DeliveryError('FORBIDDEN', 'No tenés permiso para operar entregas.', 403)
   }
   return req.user
 }
@@ -246,7 +246,7 @@ export async function buildProposal(
   req: DeliveryRequest,
   input: unknown,
 ): Promise<{ lines: ProposalLineView[] }> {
-  assertAdmin(req)
+  assertDeliveryOperator(req)
   const parsed: ProposalInput = parseProposalInput(input)
 
   const versions = new Map<string, BundleVersion>()
@@ -335,7 +335,7 @@ export type HydratedDelivery = {
 }
 
 export async function getDeliveryById(req: DeliveryRequest, deliveryId: string): Promise<HydratedDelivery> {
-  assertAdmin(req)
+  assertDeliveryOperator(req)
   let delivery: Delivery
   try {
     delivery = (await req.payload.findByID({
@@ -382,7 +382,7 @@ export async function listDeliveries(
   req: DeliveryRequest,
   options: { page: number; limit: number },
 ): Promise<{ docs: HydratedDelivery[]; totalDocs: number; page: number; totalPages: number; limit: number }> {
-  assertAdmin(req)
+  assertDeliveryOperator(req)
   const result = await req.payload.find({
     collection: 'deliveries',
     depth: 1,
@@ -429,7 +429,7 @@ export async function listDeliveries(
 }
 
 export async function confirmDelivery(req: DeliveryRequest, input: unknown): Promise<HydratedDelivery> {
-  const actor = assertAdmin(req)
+  const actor = assertDeliveryOperator(req)
   const parsed: ConfirmDeliveryInput = parseConfirmDeliveryInput(input)
   const operationKey = parsed.operationKey ?? `delivery-${crypto.randomUUID()}`
 

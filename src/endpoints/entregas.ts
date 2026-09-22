@@ -1,6 +1,6 @@
 import type { Endpoint } from 'payload'
 
-import { hasRole } from '@/access/roles'
+import { canAccessModule } from '@/access/roles'
 import { deliveryErrorResponse, DeliveryError } from '@/deliveries/errors'
 import {
   buildProposal,
@@ -17,8 +17,8 @@ type EntregaRequest = DeliveryRequest & {
 
 function authorize(req: EntregaRequest): User {
   if (!req.user) throw new DeliveryError('UNAUTHENTICATED', 'La sesión es obligatoria.', 401)
-  if (!hasRole(req.user, 'admin')) {
-    throw new DeliveryError('FORBIDDEN', 'Solo el Administrador puede operar entregas.', 403)
+  if (!canAccessModule(req.user, 'deliveries')) {
+    throw new DeliveryError('FORBIDDEN', 'No tenés permiso para operar entregas.', 403)
   }
   return req.user
 }

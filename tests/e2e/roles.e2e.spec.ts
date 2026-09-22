@@ -39,12 +39,17 @@ test('stock users only see and can open inventory', async ({ page }) => {
   await expect(page).toHaveURL(`${serverURL}/`)
 })
 
-test('administration users only see and can open family groups', async ({ page }) => {
+test('administration users see and can open family groups and deliveries', async ({ page }) => {
   await loginAs(page, roleUsers.administration)
 
   await expect(page.getByRole('link', { name: 'Grupos familiares', exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('link', { name: 'Entregas', exact: true }).first()).toBeVisible()
   await expect(page.getByRole('link', { name: 'Inventario', exact: true })).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'Grupos familiares', exact: true })).toBeVisible()
+
+  await page.goto(`${serverURL}/entregas`)
+  await expect(page).toHaveURL(`${serverURL}/entregas`)
+  await expect(page.getByRole('heading', { name: 'Entregas', exact: true })).toBeVisible()
 
   await page.goto(`${serverURL}/inventario`)
   await expect(page).toHaveURL(`${serverURL}/`)
@@ -79,20 +84,8 @@ test('administrators see all current module cards', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Reportes', exact: true })).toBeVisible()
 })
 
-test('only administrators can open deliveries', async ({ page }) => {
-  await loginAs(page, roleUsers.admin)
-
-  await expect(page.getByRole('link', { name: 'Entregas', exact: true }).first()).toBeVisible()
-  await page.goto(`${serverURL}/entregas`)
-  await expect(page).toHaveURL(`${serverURL}/entregas`)
-  await expect(page.getByRole('heading', { name: 'Entregas', exact: true })).toBeVisible()
-
+test('stock users cannot open deliveries', async ({ page }) => {
   await loginAs(page, roleUsers.stock)
-  await expect(page.getByRole('link', { name: 'Entregas', exact: true })).toHaveCount(0)
-  await page.goto(`${serverURL}/entregas`)
-  await expect(page).toHaveURL(`${serverURL}/`)
-
-  await loginAs(page, roleUsers.administration)
   await expect(page.getByRole('link', { name: 'Entregas', exact: true })).toHaveCount(0)
   await page.goto(`${serverURL}/entregas`)
   await expect(page).toHaveURL(`${serverURL}/`)

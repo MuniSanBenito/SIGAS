@@ -9,7 +9,7 @@ import {
   IconUsers,
   IconX,
 } from '@tabler/icons-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import type { Role } from '@/access/roles'
 import {
@@ -18,6 +18,7 @@ import {
   type Contribuyente,
 } from '@/lib/contribuyente-map'
 
+import { AppDialog, AppDialogBody, AppDialogFooter } from '../app-dialog'
 import { ContribuyentesWorkspace } from './contribuyentes-workspace'
 import type { DraftMember, ExistingMembership, FamilyGroupView, KinshipOption } from './group-ui-types'
 
@@ -846,7 +847,6 @@ function AddMemberDialog({
   onClose: () => void
   onSaved: (group: FamilyGroupView) => void
 }) {
-  const closeButtonRef = useRef<HTMLButtonElement>(null)
   const [search, setSearch] = useState('')
   const [results, setResults] = useState<Contribuyente[]>([])
   const [selected, setSelected] = useState<Contribuyente | null>(null)
@@ -858,10 +858,6 @@ function AddMemberDialog({
   const [saving, setSaving] = useState(false)
 
   const selectedKinship = kinships.find((item) => item.id === kinshipId)
-
-  useEffect(() => {
-    closeButtonRef.current?.focus()
-  }, [])
 
   const visibleResults = search.trim() ? results : []
 
@@ -927,18 +923,13 @@ function AddMemberDialog({
   }
 
   return (
-    <div aria-modal="true" className="fixed inset-0 z-50 grid place-items-center bg-neutral-950/50 p-4" role="dialog">
-      <div className="max-h-[min(44rem,calc(100vh-2rem))] w-full max-w-2xl overflow-y-auto rounded-box border border-line bg-surface shadow-2xl">
-        <div className="flex items-start justify-between border-b border-line p-5">
-          <div>
-            <h2 className="text-xl font-bold text-content">Agregar integrante</h2>
-            <p className="text-sm text-content-muted">Buscá en el padrón y confirmá el parentesco.</p>
-          </div>
-          <button aria-label="Cerrar" className="btn btn-ghost btn-sm btn-square" onClick={onClose} ref={closeButtonRef} type="button">
-            <IconX aria-hidden="true" size={18} />
-          </button>
-        </div>
-        <div className="space-y-4 p-5">
+    <AppDialog
+      description="Buscá en el padrón y confirmá el parentesco."
+      onClose={onClose}
+      title="Agregar integrante"
+    >
+      <AppDialogBody>
+        <div className="space-y-4">
           {selected ? (
             <div className="rounded-box border border-line bg-page p-4">
               <p className="font-semibold">{formatContribuyenteNombre(selected.nombre)}</p>
@@ -970,14 +961,14 @@ function AddMemberDialog({
             </>
           )}
           {error && <div className="alert alert-error" role="alert"><span>{error}</span></div>}
-          <div className="flex justify-end gap-3">
-            <button className="btn btn-ghost" onClick={onClose} type="button">Cancelar</button>
-            <button className="btn btn-primary" disabled={saving} onClick={() => void save()} type="button">
-              {saving ? 'Guardando…' : 'Agregar'}
-            </button>
-          </div>
         </div>
-      </div>
-    </div>
+      </AppDialogBody>
+      <AppDialogFooter>
+        <button className="btn btn-ghost min-h-11" onClick={onClose} type="button">Cancelar</button>
+        <button className="btn btn-primary min-h-11" disabled={saving} onClick={() => void save()} type="button">
+          {saving ? 'Guardando…' : 'Agregar'}
+        </button>
+      </AppDialogFooter>
+    </AppDialog>
   )
 }

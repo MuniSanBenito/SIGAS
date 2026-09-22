@@ -8,6 +8,10 @@ const LAST_ADMIN_ERROR = 'No se puede quitar ni eliminar al último administrado
 
 export const Users: CollectionConfig = {
   slug: 'users',
+  labels: {
+    plural: 'Usuarios',
+    singular: 'Usuario',
+  },
   admin: {
     useAsTitle: 'username',
   },

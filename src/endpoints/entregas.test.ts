@@ -19,13 +19,19 @@ describe('entrega endpoints', () => {
     expect(response.status).toBe(401)
   })
 
-  it('rejects non-admin roles', async () => {
-    for (const roles of [['stock'], ['administracion']]) {
-      const response = await handler('get', '/entregas')({
-        url: 'http://localhost/api/entregas',
-        user: { roles },
-      })
-      expect(response.status).toBe(403)
-    }
+  it('allows administration users past delivery authorization', async () => {
+    const response = await handler('get', '/entregas')({
+      url: 'http://localhost/api/entregas?page=1&limit=15',
+      user: { roles: ['administracion'] },
+    })
+    expect(response.status).not.toBe(403)
+  })
+
+  it('rejects users without delivery access', async () => {
+    const response = await handler('get', '/entregas')({
+      url: 'http://localhost/api/entregas',
+      user: { roles: ['stock'] },
+    })
+    expect(response.status).toBe(403)
   })
 })

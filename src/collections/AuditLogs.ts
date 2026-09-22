@@ -5,6 +5,10 @@ import { validateRequiredText } from '../inventory/field-validation'
 
 export const AuditLogs: CollectionConfig = {
   slug: 'audit-logs',
+  labels: {
+    plural: 'Registros de auditoría',
+    singular: 'Registro de auditoría',
+  },
   admin: {
     defaultColumns: ['createdAt', 'module', 'action', 'targetType', 'targetId', 'result', 'actor'],
     useAsTitle: 'action',

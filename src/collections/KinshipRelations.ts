@@ -15,6 +15,10 @@ export const DEFAULT_KINSHIP_RELATIONS = [
 
 export const KinshipRelations: CollectionConfig = {
   slug: 'kinship-relations',
+  labels: {
+    plural: 'Parentescos',
+    singular: 'Parentesco',
+  },
   admin: {
     defaultColumns: ['label', 'code', 'isActive', 'sortOrder'],
     useAsTitle: 'label',

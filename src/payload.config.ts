@@ -2,6 +2,7 @@ import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { lexicalEditor } from '@payloadcms/richtext-lexical'
 import path from 'path'
 import { buildConfig } from 'payload'
+import { es } from 'payload/i18n/es'
 import { fileURLToPath } from 'url'
 import sharp from 'sharp'
 
@@ -35,6 +36,13 @@ export default buildConfig({
     importMap: {
       baseDir: path.resolve(dirname),
     },
+    meta: {
+      titleSuffix: '· SIGAS',
+    },
+  },
+  i18n: {
+    fallbackLanguage: 'es',
+    supportedLanguages: { es },
   },
   collections: [
     Users,

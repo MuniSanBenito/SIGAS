@@ -5,6 +5,10 @@ import { validatePositiveInteger, validateRequiredText } from '../inventory/fiel
 
 export const DeliveryLines: CollectionConfig = {
   slug: 'delivery-lines',
+  labels: {
+    plural: 'Líneas de entrega',
+    singular: 'Línea de entrega',
+  },
   admin: {
     defaultColumns: ['delivery', 'product', 'lot', 'quantity'],
     useAsTitle: 'operationKey',

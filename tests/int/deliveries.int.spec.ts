@@ -26,6 +26,7 @@ describe('deliveries service', () => {
   let payload: Payload
   let actor: User
   let stockActor: User
+  let administrationActor: User
   let product: Product
   let categoryId: string
   let bundleVersion: BundleVersion
@@ -53,6 +54,16 @@ describe('deliveries service', () => {
         password: 'test',
         roles: ['stock'],
         username: `994${Date.now().toString().slice(-6)}`,
+      },
+      overrideAccess: true,
+    })) as User
+
+    administrationActor = (await payload.create({
+      collection: 'users',
+      data: {
+        password: 'test',
+        roles: ['administracion'],
+        username: `995${Date.now().toString().slice(-6)}`,
       },
       overrideAccess: true,
     })) as User
@@ -186,6 +197,7 @@ describe('deliveries service', () => {
     await payload.delete({ collection: 'product-categories', id: categoryId, overrideAccess: true })
     await payload.delete({ collection: 'users', id: actor.id, overrideAccess: true })
     await payload.delete({ collection: 'users', id: stockActor.id, overrideAccess: true })
+    await payload.delete({ collection: 'users', id: administrationActor.id, overrideAccess: true })
   })
 
   it('builds a proposal expanding the recipe with availability', async () => {
@@ -303,7 +315,7 @@ describe('deliveries service', () => {
     expect(confirmed.delivery.receiverIsThirdParty).toBe(true)
   })
 
-  it('forbids non-admin users from confirming', async () => {
+  it('forbids stock users from confirming deliveries', async () => {
     const req = { payload, user: stockActor } as unknown as DeliveryRequest
     await expect(
       confirmDelivery(req, {
@@ -315,6 +327,21 @@ describe('deliveries service', () => {
         lines: [{ productId: product.id, quantity: 1 }],
       }),
     ).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 })
+  })
+
+  it('allows administration users to confirm deliveries', async () => {
+    const req = { payload, user: administrationActor } as unknown as DeliveryRequest
+    const confirmed = await confirmDelivery(req, {
+      groupId,
+      receiverContributorId: 'contrib-1',
+      receiverIsThirdParty: false,
+      deliveryDate: '2026-09-16',
+      operationKey: `${runKey}-confirm-administration`,
+      bundles: [],
+      lines: [{ productId: product.id, quantity: 1 }],
+    })
+    createdDeliveryIds.push(confirmed.delivery.id)
+    expect(confirmed.delivery.status).toBe('confirmed')
   })
 
   it(

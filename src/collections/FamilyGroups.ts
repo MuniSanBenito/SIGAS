@@ -5,6 +5,10 @@ import { validateRequiredText } from '../inventory/field-validation'
 
 export const FamilyGroups: CollectionConfig = {
   slug: 'family-groups',
+  labels: {
+    plural: 'Grupos familiares',
+    singular: 'Grupo familiar',
+  },
   admin: {
     defaultColumns: ['referenteContributorId', 'status', 'startedAt', 'updatedAt'],
     useAsTitle: 'referenteContributorId',

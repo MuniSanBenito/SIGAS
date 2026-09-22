@@ -1,10 +1,12 @@
 'use client'
 
-import { IconEdit, IconPlus, IconRefresh, IconSearch, IconX } from '@tabler/icons-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { IconEdit, IconPlus, IconRefresh, IconSearch } from '@tabler/icons-react'
+import { useEffect, useMemo, useState } from 'react'
 
 import type { Role } from '@/access/roles'
 import { buildContribuyenteSearchParams, formatContribuyenteNombre, splitNombreApellido, type Contribuyente } from '@/lib/contribuyente-map'
+
+import { AppDialog, AppDialogBody, AppDialogFooter } from '../app-dialog'
 
 type FormState = {
   nombre: string
@@ -75,17 +77,6 @@ export function ContribuyentesWorkspace({
   const [form, setForm] = useState<FormState>(emptyForm)
   const [saving, setSaving] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
-  const closeButtonRef = useRef<HTMLButtonElement>(null)
-
-  useEffect(() => {
-    if (!modalOpen) return
-    closeButtonRef.current?.focus()
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setModalOpen(false)
-    }
-    document.addEventListener('keydown', closeOnEscape)
-    return () => document.removeEventListener('keydown', closeOnEscape)
-  }, [modalOpen])
 
   const query = useMemo(() => {
     const params = buildContribuyenteSearchParams(search, limit)
@@ -204,7 +195,57 @@ export function ContribuyentesWorkspace({
         {!loading && totalDocs > 0 && <div className="flex flex-col gap-3 py-4 text-sm text-content-muted sm:flex-row sm:items-center sm:justify-between"><span>Mostrando {((page - 1) * limit) + 1}–{Math.min(page * limit, totalDocs)} de {totalDocs.toLocaleString('es-AR')}</span><div className="flex items-center gap-2"><label className="sr-only" htmlFor="page-size">Registros por página</label><select className="select select-bordered select-sm bg-surface" id="page-size" onChange={(event) => { setLimit(Number(event.target.value)); setPage(1) }} value={limit}><option value={15}>15 / pág.</option><option value={30}>30 / pág.</option><option value={50}>50 / pág.</option></select><button className="btn btn-ghost btn-sm" disabled={page <= 1 || refreshing} onClick={() => setPage((value) => value - 1)} type="button">Anterior</button><span aria-live="polite">{page} / {totalPages}</span><button className="btn btn-ghost btn-sm" disabled={page >= totalPages || refreshing} onClick={() => setPage((value) => value + 1)} type="button">Siguiente</button></div></div>}
       </section>
 
-      {modalOpen && <div aria-labelledby="contribuyente-dialog-title" aria-modal="true" className="fixed inset-0 z-50 grid place-items-center bg-neutral-950/50 p-4" role="dialog"><div className="max-h-[min(46rem,calc(100vh-2rem))] w-full max-w-3xl overflow-y-auto rounded-box border border-line bg-surface shadow-2xl"><div className="flex items-start justify-between border-b border-line p-5 sm:p-6"><div><p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Padrón municipal</p><h2 className="mt-1 text-xl font-bold text-content" id="contribuyente-dialog-title">{editing ? 'Editar contribuyente' : 'Nuevo contribuyente'}</h2></div><button aria-label="Cerrar formulario" className="btn btn-ghost btn-sm btn-square" onClick={() => setModalOpen(false)} ref={closeButtonRef} type="button"><IconX aria-hidden="true" size={18} /></button></div><div className="space-y-5 p-5 sm:p-6"><div className="grid gap-4 sm:grid-cols-2">{([{ key: 'nombre', label: 'Nombre' }, { key: 'apellido', label: 'Apellido' }, { key: 'dni', label: 'DNI' }, { key: 'cuit', label: 'CUIT' }, { key: 'telefono', label: 'Teléfono' }, { key: 'email', label: 'Email', type: 'email' }, { key: 'direccion', label: 'Dirección' }, { key: 'barrio', label: 'Barrio' }, { key: 'fechaNacimiento', label: 'Fecha de nacimiento', type: 'date' }] as readonly { key: keyof FormState; label: string; type?: 'email' | 'date' }[]).map(({ key, label, type }) => <label className="form-control gap-1" key={key}><span className="label-text font-semibold text-content">{label}{(key === 'nombre' || key === 'apellido') && <span className="text-error"> *</span>}</span><input className="input input-bordered bg-page text-content" onChange={(event) => updateField(key, event.target.value)} type={type ?? 'text'} value={form[key]} /></label>)}</div>{formError && <div className="alert alert-error" role="alert"><span>{formError}</span></div>}<div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end"><button className="btn btn-ghost" onClick={() => setModalOpen(false)} type="button">Cancelar</button><button className="btn btn-primary" disabled={saving} onClick={() => void save()} type="button">{saving && <span className="loading loading-spinner loading-sm" />}{saving ? 'Guardando…' : 'Guardar cambios'}</button></div></div></div></div>}
+      {modalOpen && (
+        <AppDialog
+          eyebrow="Padrón municipal"
+          onClose={() => setModalOpen(false)}
+          size="xl"
+          title={editing ? 'Editar contribuyente' : 'Nuevo contribuyente'}
+        >
+          <AppDialogBody>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {([
+                { key: 'nombre', label: 'Nombre' },
+                { key: 'apellido', label: 'Apellido' },
+                { key: 'dni', label: 'DNI' },
+                { key: 'cuit', label: 'CUIT' },
+                { key: 'telefono', label: 'Teléfono' },
+                { key: 'email', label: 'Email', type: 'email' },
+                { key: 'direccion', label: 'Dirección' },
+                { key: 'barrio', label: 'Barrio' },
+                { key: 'fechaNacimiento', label: 'Fecha de nacimiento', type: 'date' },
+              ] as const).map(({ key, label, type }) => (
+                <label className="form-control gap-1" key={key}>
+                  <span className="label-text font-semibold text-content">
+                    {label}
+                    {(key === 'nombre' || key === 'apellido') && <span className="text-error"> *</span>}
+                  </span>
+                  <input
+                    className="input input-bordered bg-page text-content"
+                    onChange={(event) => updateField(key, event.target.value)}
+                    type={type ?? 'text'}
+                    value={form[key]}
+                  />
+                </label>
+              ))}
+            </div>
+            {formError && (
+              <div className="alert alert-error mt-5" role="alert">
+                <span>{formError}</span>
+              </div>
+            )}
+          </AppDialogBody>
+          <AppDialogFooter>
+            <button className="btn btn-ghost min-h-11" onClick={() => setModalOpen(false)} type="button">
+              Cancelar
+            </button>
+            <button className="btn btn-primary min-h-11" disabled={saving} onClick={() => void save()} type="button">
+              {saving && <span className="loading loading-spinner loading-sm" />}
+              {saving ? 'Guardando…' : 'Guardar cambios'}
+            </button>
+          </AppDialogFooter>
+        </AppDialog>
+      )}
     </main>
   )
 }

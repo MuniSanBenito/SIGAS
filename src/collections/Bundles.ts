@@ -5,6 +5,10 @@ import { validateRequiredText } from '../inventory/field-validation'
 
 export const Bundles: CollectionConfig = {
   slug: 'bundles',
+  labels: {
+    plural: 'Bolsones',
+    singular: 'Bolsón',
+  },
   admin: {
     defaultColumns: ['name', 'isActive', 'updatedAt'],
     useAsTitle: 'name',

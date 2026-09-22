@@ -6,6 +6,10 @@ import { validateNonNegativeInteger, validateRequiredText } from '../inventory/f
 
 export const Products: CollectionConfig = {
   slug: 'products',
+  labels: {
+    plural: 'Productos',
+    singular: 'Producto',
+  },
   admin: {
     defaultColumns: ['name', 'category', 'tracksLotExpiration', 'minimumStock', 'isActive', 'updatedAt'],
     useAsTitle: 'name',

@@ -5,6 +5,10 @@ import { validateRequiredText } from '../inventory/field-validation'
 
 export const Deliveries: CollectionConfig = {
   slug: 'deliveries',
+  labels: {
+    plural: 'Entregas',
+    singular: 'Entrega',
+  },
   admin: {
     defaultColumns: ['group', 'deliveryDate', 'receiverContributorId', 'confirmedAt'],
     useAsTitle: 'operationKey',

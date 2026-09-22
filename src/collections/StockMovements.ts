@@ -5,6 +5,10 @@ import { validateNonNegativeInteger, validatePositiveInteger, validateRequiredTe
 
 export const StockMovements: CollectionConfig = {
   slug: 'stock-movements',
+  labels: {
+    plural: 'Movimientos de stock',
+    singular: 'Movimiento de stock',
+  },
   admin: {
     defaultColumns: ['operationalDate', 'movementType', 'product', 'lot', 'quantity', 'reason', 'createdBy'],
     useAsTitle: 'operationKey',

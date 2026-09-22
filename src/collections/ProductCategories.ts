@@ -5,6 +5,10 @@ import { validateRequiredText } from '../inventory/field-validation'
 
 export const ProductCategories: CollectionConfig = {
   slug: 'product-categories',
+  labels: {
+    plural: 'Categorías de producto',
+    singular: 'Categoría de producto',
+  },
   admin: {
     defaultColumns: ['name', 'isActive', 'updatedAt'],
     useAsTitle: 'name',

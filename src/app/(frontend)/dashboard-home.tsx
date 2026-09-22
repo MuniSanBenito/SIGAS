@@ -37,7 +37,7 @@ const moduleCards: ModuleCard[] = [
     description: 'Registro de asistencia y entregas efectivas.',
     href: '/entregas',
     icon: IconHeartHandshake,
-    requiredRoles: ['admin'],
+    requiredRoles: ['admin', 'administracion'],
     title: 'Entregas',
   },
   {

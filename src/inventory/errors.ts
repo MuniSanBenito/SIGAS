@@ -1,3 +1,5 @@
+import { inventoryErrorMessage } from './labels'
+
 export type InventoryErrorCode =
   | 'UNAUTHENTICATED'
   | 'FORBIDDEN'
@@ -27,7 +29,7 @@ export function inventoryErrorResponse(error: unknown): Response {
       {
         error: {
           code: error.code,
-          message: error.message,
+          message: inventoryErrorMessage(error.message),
           ...(error.details === undefined ? {} : { details: error.details }),
         },
       },

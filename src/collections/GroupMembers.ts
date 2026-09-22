@@ -5,6 +5,10 @@ import { validateRequiredText } from '../inventory/field-validation'
 
 export const GroupMembers: CollectionConfig = {
   slug: 'group-members',
+  labels: {
+    plural: 'Integrantes de grupo',
+    singular: 'Integrante de grupo',
+  },
   admin: {
     defaultColumns: ['group', 'contributorId', 'isReferent', 'status', 'startedAt'],
     useAsTitle: 'contributorId',
