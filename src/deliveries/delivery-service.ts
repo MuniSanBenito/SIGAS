@@ -5,6 +5,7 @@ import type { Contribuyente } from '@/lib/contribuyente-map'
 import { canAccessModule, getRoles } from '../access/roles'
 import { recordStockMovement, type InventoryRequest } from '../inventory/stock-service'
 import type {
+  Bundle,
   BundleVersion,
   Delivery,
   FamilyGroup,
@@ -240,6 +241,106 @@ export type ProposalLineView = ProposedLine & {
   tracksLotExpiration: boolean
   availableQuantity: number
   lots: { id: string; code: string; expirationDate: string; quantity: number }[]
+}
+
+export type DeliveryCatalogProduct = {
+  id: string
+  name: string
+  tracksLotExpiration: boolean
+}
+
+export type DeliveryCatalogBundle = {
+  bundleName: string
+  id: string
+  lines: { productId: string; productName: string; quantity: number }[]
+  version: number
+}
+
+export async function listDeliveryCatalog(req: DeliveryRequest): Promise<{
+  bundleVersions: DeliveryCatalogBundle[]
+  products: DeliveryCatalogProduct[]
+}> {
+  assertDeliveryOperator(req)
+
+  const productsResult = await req.payload.find({
+    collection: 'products',
+    depth: 0,
+    limit: 1000,
+    overrideAccess: true,
+    req,
+    sort: 'name',
+    where: { isActive: { equals: true } },
+  })
+  const activeProducts = productsResult.docs as Product[]
+
+  const versionsResult = await req.payload.find({
+    collection: 'bundle-versions',
+    depth: 0,
+    limit: 1000,
+    overrideAccess: true,
+    req,
+    sort: 'version',
+    where: { status: { equals: 'current' } },
+  })
+  const versions = versionsResult.docs as BundleVersion[]
+  const bundleIds = Array.from(new Set(versions.map((version) => relationId(version.bundle))))
+  const bundlesResult = bundleIds.length
+    ? await req.payload.find({
+        collection: 'bundles',
+        depth: 0,
+        limit: bundleIds.length,
+        overrideAccess: true,
+        req,
+        where: { id: { in: bundleIds } },
+      })
+    : { docs: [] }
+  const bundleNameById = new Map(
+    (bundlesResult.docs as Bundle[]).filter((bundle) => bundle.isActive).map((bundle) => [bundle.id, bundle.name]),
+  )
+
+  const knownProductIds = new Set(activeProducts.map((item) => item.id))
+  const missingProductIds = Array.from(
+    new Set(
+      versions.flatMap((version) => version.lines.map((line) => relationId(line.product))).filter((id) => !knownProductIds.has(id)),
+    ),
+  )
+  const extraProducts = missingProductIds.length
+    ? await req.payload.find({
+        collection: 'products',
+        depth: 0,
+        limit: missingProductIds.length,
+        overrideAccess: true,
+        req,
+        where: { id: { in: missingProductIds } },
+      })
+    : { docs: [] }
+  const productNameById = new Map<string, string>()
+  for (const item of [...activeProducts, ...(extraProducts.docs as Product[])]) {
+    productNameById.set(item.id, item.name)
+  }
+
+  return {
+    products: activeProducts.map((item) => ({
+      id: item.id,
+      name: item.name,
+      tracksLotExpiration: Boolean(item.tracksLotExpiration),
+    })),
+    bundleVersions: versions
+      .filter((version) => bundleNameById.has(relationId(version.bundle)))
+      .map((version) => ({
+        bundleName: bundleNameById.get(relationId(version.bundle)) as string,
+        id: version.id,
+        lines: version.lines.map((line) => {
+          const productId = relationId(line.product)
+          return {
+            productId,
+            productName: productNameById.get(productId) ?? productId,
+            quantity: line.quantity,
+          }
+        }),
+        version: version.version,
+      })),
+  }
 }
 
 export async function buildProposal(

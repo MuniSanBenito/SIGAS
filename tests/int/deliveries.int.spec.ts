@@ -6,6 +6,7 @@ import { recordStockMovement, type InventoryRequest } from '@/inventory/stock-se
 import {
   buildProposal,
   confirmDelivery,
+  listDeliveryCatalog,
   type DeliveryRequest,
 } from '@/deliveries/delivery-service'
 import type { BundleVersion, Product, User } from '@/payload-types'
@@ -434,4 +435,70 @@ describe('deliveries service', () => {
     },
     15000,
   )
+
+  it('lists current bundles and active products for administration without opening stock writes', async () => {
+    const inactive = await payload.create({
+      collection: 'products',
+      data: {
+        category: categoryId,
+        inactiveReason: 'Fuera del catálogo de entrega',
+        isActive: false,
+        minimumStock: 0,
+        name: `Inactive delivery product ${runKey}`,
+        tracksLotExpiration: false,
+      },
+      overrideAccess: true,
+    })
+    const historical = await payload.create({
+      collection: 'bundle-versions',
+      data: {
+        bundle: bundleId,
+        createdBy: actor.id,
+        effectiveFrom: '2026-08-01',
+        lines: [{ product: product.id, quantity: 1 }],
+        status: 'historical',
+        version: 99,
+      },
+      overrideAccess: true,
+    })
+
+    const catalog = await listDeliveryCatalog({ payload, user: administrationActor } as unknown as DeliveryRequest)
+    expect(catalog.products).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: product.id, name: product.name, tracksLotExpiration: false })]),
+    )
+    expect(catalog.products.some((item) => item.id === inactive.id)).toBe(false)
+    expect(catalog.bundleVersions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          bundleName: `Delivery bundle ${runKey}`,
+          id: bundleVersion.id,
+          lines: [expect.objectContaining({ productId: product.id, quantity: 2 })],
+          version: 1,
+        }),
+      ]),
+    )
+    expect(catalog.bundleVersions.some((item) => item.id === historical.id)).toBe(false)
+
+    await expect(
+      listDeliveryCatalog({ payload, user: stockActor } as unknown as DeliveryRequest),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 })
+
+    await expect(
+      payload.create({
+        collection: 'products',
+        data: {
+          category: categoryId,
+          isActive: true,
+          minimumStock: 0,
+          name: `Blocked product ${runKey}`,
+          tracksLotExpiration: false,
+        },
+        overrideAccess: false,
+        user: administrationActor,
+      }),
+    ).rejects.toThrow()
+
+    await payload.delete({ collection: 'bundle-versions', id: historical.id, overrideAccess: true })
+    await payload.delete({ collection: 'products', id: inactive.id, overrideAccess: true })
+  })
 })

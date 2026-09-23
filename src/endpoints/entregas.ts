@@ -7,6 +7,7 @@ import {
   confirmDelivery,
   getDeliveryById,
   listDeliveries,
+  listDeliveryCatalog,
   type DeliveryRequest,
 } from '@/deliveries/delivery-service'
 import type { User } from '@/payload-types'
@@ -55,6 +56,15 @@ async function getDeliveryEndpoint(req: EntregaRequest): Promise<Response> {
   }
 }
 
+async function catalogEndpoint(req: EntregaRequest): Promise<Response> {
+  try {
+    authorize(req)
+    return Response.json(await listDeliveryCatalog(req))
+  } catch (error) {
+    return deliveryErrorResponse(error)
+  }
+}
+
 async function proposalEndpoint(req: EntregaRequest): Promise<Response> {
   try {
     authorize(req)
@@ -76,6 +86,7 @@ async function confirmDeliveryEndpoint(req: EntregaRequest): Promise<Response> {
 
 export const deliveryEndpoints: Endpoint[] = [
   { handler: (req) => listDeliveriesEndpoint(req as EntregaRequest), method: 'get', path: '/entregas' },
+  { handler: (req) => catalogEndpoint(req as EntregaRequest), method: 'get', path: '/entregas/catalogo' },
   { handler: (req) => proposalEndpoint(req as EntregaRequest), method: 'post', path: '/entregas/propuesta' },
   { handler: (req) => confirmDeliveryEndpoint(req as EntregaRequest), method: 'post', path: '/entregas' },
   { handler: (req) => getDeliveryEndpoint(req as EntregaRequest), method: 'get', path: '/entregas/:id' },

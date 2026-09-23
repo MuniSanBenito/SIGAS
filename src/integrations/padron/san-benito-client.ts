@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
+
 import { getExternalApiConfig } from '@/config'
 import type { Contribuyente, ExternalContributorInput } from '@/lib/contribuyente-map'
 
@@ -90,7 +93,61 @@ async function request<T>(path: string, init?: RequestInit, params?: URLSearchPa
   return sanitize(data)
 }
 
+function fixtureFilePath(): string | null {
+  if (process.env.NODE_ENV === 'production') return null
+  return process.env.SIGAS_PADRON_FIXTURE || path.join(process.cwd(), '.e2e-padron.json')
+}
+
+function readFixtureContribuyentes(): Contribuyente[] | null {
+  const filePath = fixtureFilePath()
+  if (!filePath) return null
+  try {
+    const parsed = JSON.parse(readFileSync(filePath, 'utf8')) as { docs?: unknown }
+    if (!parsed || !Array.isArray(parsed.docs)) {
+      throw new ExternalApiError('El padrón de prueba es inválido.', 502)
+    }
+    return parsed.docs.map((item) => sanitize(item as Contribuyente))
+  } catch (error) {
+    if (error instanceof ExternalApiError) throw error
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null
+    throw new ExternalApiError('El padrón de prueba es inválido.', 502)
+  }
+}
+
+function fixtureMatches(doc: Contribuyente, params: URLSearchParams): boolean {
+  const clauses: boolean[] = []
+  for (const [key, value] of params.entries()) {
+    if (/^where\[or]\[\d+]\[nombre]\[contains]$/.test(key)) {
+      clauses.push(String(doc.nombre ?? '').toLowerCase().includes(value.toLowerCase()))
+    }
+    if (/^where\[or]\[\d+]\[numero_documento]\[contains]$/.test(key)) {
+      clauses.push(String(doc.numero_documento ?? '').toLowerCase().includes(value.toLowerCase()))
+    }
+    if (/^where\[or]\[\d+]\[numero_contribuyente]\[equals]$/.test(key)) {
+      clauses.push(String(doc.numero_contribuyente ?? '') === value)
+    }
+  }
+  return clauses.length === 0 || clauses.some(Boolean)
+}
+
+function fixtureList(docs: Contribuyente[], searchParams: URLSearchParams): ContribuyentesListResponse {
+  const limit = Math.max(1, Number.parseInt(searchParams.get('limit') ?? '15', 10) || 15)
+  const filtered = docs.filter((doc) => fixtureMatches(doc, searchParams)).slice(0, limit)
+  return {
+    docs: filtered,
+    hasNextPage: false,
+    limit,
+    nextPage: null,
+    page: 1,
+    totalDocs: filtered.length,
+    totalPages: 1,
+  }
+}
+
 export async function findContribuyentes(searchParams: URLSearchParams): Promise<ContribuyentesListResponse> {
+  const fixture = readFixtureContribuyentes()
+  if (fixture) return fixtureList(fixture, searchParams)
+
   const params = new URLSearchParams(searchParams)
   applySelect(params)
   const data = await request<unknown>('', undefined, params)
@@ -102,6 +159,12 @@ export async function findContribuyentes(searchParams: URLSearchParams): Promise
 
 export async function getContribuyenteById(id: string): Promise<{ doc: Contribuyente }> {
   if (!id.trim()) throw new ExternalApiError('El ID del contribuyente es obligatorio.', 422)
+  const fixture = readFixtureContribuyentes()
+  if (fixture) {
+    const doc = fixture.find((item) => item.id === id)
+    if (!doc) throw new ExternalApiError('Contribuyente no encontrado.', 404)
+    return { doc }
+  }
   const params = new URLSearchParams()
   applySelect(params)
   const data = await request<unknown>(`/${encodeURIComponent(id)}`, undefined, params)

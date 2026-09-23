@@ -34,4 +34,19 @@ describe('entrega endpoints', () => {
     })
     expect(response.status).toBe(403)
   })
+
+  it('rejects unauthenticated catalog requests', async () => {
+    const response = await handler('get', '/entregas/catalogo')({
+      url: 'http://localhost/api/entregas/catalogo',
+    })
+    expect(response.status).toBe(401)
+  })
+
+  it('rejects stock users from the delivery catalog', async () => {
+    const response = await handler('get', '/entregas/catalogo')({
+      url: 'http://localhost/api/entregas/catalogo',
+      user: { roles: ['stock'] },
+    })
+    expect(response.status).toBe(403)
+  })
 })

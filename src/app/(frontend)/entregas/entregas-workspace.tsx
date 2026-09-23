@@ -373,47 +373,26 @@ function CreateDeliveryPanel({ onBack, onCreated }: { onBack: () => void; onCrea
   const [error, setError] = useState('')
 
   useEffect(() => {
+    const controller = new AbortController()
     async function loadCatalog() {
       try {
-        const [versionsResponse, productsResponse] = await Promise.all([
-          fetch('/api/bundle-versions?limit=100&where[status][equals]=current', { credentials: 'include' }),
-          fetch('/api/products?limit=200&where[isActive][equals]=true', { credentials: 'include' }),
-        ])
-        const versionsPayload = await versionsResponse.json().catch(() => null)
-        const productsPayload = await productsResponse.json().catch(() => null)
-        if (versionsResponse.ok && Array.isArray(versionsPayload?.docs)) {
-          setBundleVersions(
-            versionsPayload.docs.map((doc: {
-              id: string
-              version: number
-              bundle: string | { name: string }
-              lines: { product: string | { id: string; name: string }; quantity: number }[]
-            }) => ({
-              id: doc.id,
-              bundleName: typeof doc.bundle === 'object' ? doc.bundle.name : doc.bundle,
-              version: doc.version,
-              lines: doc.lines.map((line) => ({
-                productId: typeof line.product === 'object' ? line.product.id : line.product,
-                productName: typeof line.product === 'object' ? line.product.name : line.product,
-                quantity: line.quantity,
-              })),
-            })),
-          )
+        const response = await fetch('/api/entregas/catalogo', {
+          credentials: 'include',
+          signal: controller.signal,
+        })
+        const payload = await response.json().catch(() => null)
+        if (!response.ok) throw new Error(errorMessage(payload, 'No se pudo cargar el catálogo de la entrega.'))
+        if (controller.signal.aborted) return
+        setBundleVersions(Array.isArray(payload?.bundleVersions) ? payload.bundleVersions : [])
+        setProducts(Array.isArray(payload?.products) ? payload.products : [])
+      } catch (value) {
+        if (value instanceof Error && value.name !== 'AbortError') {
+          setError(value.message)
         }
-        if (productsResponse.ok && Array.isArray(productsPayload?.docs)) {
-          setProducts(
-            productsPayload.docs.map((doc: { id: string; name: string; tracksLotExpiration: boolean }) => ({
-              id: doc.id,
-              name: doc.name,
-              tracksLotExpiration: Boolean(doc.tracksLotExpiration),
-            })),
-          )
-        }
-      } catch {
-        // El catálogo se reintenta al avanzar; no bloquea el wizard.
       }
     }
     void loadCatalog()
+    return () => controller.abort()
   }, [])
 
   async function loadProposal() {
@@ -823,6 +802,18 @@ function ContentPicker(props: {
   const [bundleQty, setBundleQty] = useState(1)
   const [productId, setProductId] = useState(props.products[0]?.id ?? '')
   const [productQty, setProductQty] = useState(1)
+
+  useEffect(() => {
+    if (!props.bundleVersions.some((item) => item.id === bundleId)) {
+      setBundleId(props.bundleVersions[0]?.id ?? '')
+    }
+  }, [bundleId, props.bundleVersions])
+
+  useEffect(() => {
+    if (!props.products.some((item) => item.id === productId)) {
+      setProductId(props.products[0]?.id ?? '')
+    }
+  }, [productId, props.products])
 
   const canPropose = props.selectedBundles.length > 0 || props.selectedLoose.length > 0
 

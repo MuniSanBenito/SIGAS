@@ -1,3 +1,7 @@
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { findContribuyentes, getContribuyenteById } from './san-benito-client'
@@ -54,5 +58,30 @@ describe('san-benito-client', () => {
     ))
 
     await expect(findContribuyentes(new URLSearchParams())).rejects.toMatchObject({ status: 401 })
+  })
+
+  it('serves a local padron fixture without calling the municipal API', async () => {
+    const directory = mkdtempSync(path.join(tmpdir(), 'sigas-padron-'))
+    const fixturePath = path.join(directory, 'padron.json')
+    writeFileSync(
+      fixturePath,
+      JSON.stringify({
+        docs: [{ id: 'fixture-1', nombre: 'PILOTO ANA', numero_documento: '40111222', clave_web: 'secret' }],
+      }),
+    )
+    vi.stubEnv('SIGAS_PADRON_FIXTURE', fixturePath)
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    try {
+      const listed = await findContribuyentes(new URLSearchParams({ 'where[or][1][numero_documento][contains]': '40111222' }))
+      const detail = await getContribuyenteById('fixture-1')
+
+      expect(fetchMock).not.toHaveBeenCalled()
+      expect(listed.docs).toEqual([{ id: 'fixture-1', nombre: 'PILOTO ANA', numero_documento: '40111222' }])
+      expect(detail.doc.id).toBe('fixture-1')
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
   })
 })
