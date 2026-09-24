@@ -7,6 +7,8 @@ import { fileURLToPath } from 'url'
 import sharp from 'sharp'
 
 import { AuditLogs } from './collections/AuditLogs'
+import { DeliveryAssistances } from './collections/DeliveryAssistances'
+import { DeliveryReports } from './collections/DeliveryReports'
 import { Deliveries } from './collections/Deliveries'
 import { DeliveryBundles } from './collections/DeliveryBundles'
 import { DeliveryLines } from './collections/DeliveryLines'
@@ -57,9 +59,11 @@ export default buildConfig({
     KinshipRelations,
     FamilyGroups,
     GroupMembers,
+    DeliveryReports,
     Deliveries,
     DeliveryBundles,
     DeliveryLines,
+    DeliveryAssistances,
     AuditLogs,
   ],
   editor: lexicalEditor(),

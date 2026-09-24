@@ -74,6 +74,11 @@ export const Deliveries: CollectionConfig = {
       validate: validateRequiredText,
     },
     {
+      name: 'report',
+      type: 'upload',
+      relationTo: 'delivery-reports',
+    },
+    {
       name: 'status',
       type: 'select',
       defaultValue: 'confirmed',

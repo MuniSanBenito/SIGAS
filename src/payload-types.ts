@@ -79,9 +79,11 @@ export interface Config {
     'kinship-relations': KinshipRelation;
     'family-groups': FamilyGroup;
     'group-members': GroupMember;
+    'delivery-reports': DeliveryReport;
     deliveries: Delivery;
     'delivery-bundles': DeliveryBundle;
     'delivery-lines': DeliveryLine;
+    'delivery-assistances': DeliveryAssistance;
     'audit-logs': AuditLog;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
@@ -102,9 +104,11 @@ export interface Config {
     'kinship-relations': KinshipRelationsSelect<false> | KinshipRelationsSelect<true>;
     'family-groups': FamilyGroupsSelect<false> | FamilyGroupsSelect<true>;
     'group-members': GroupMembersSelect<false> | GroupMembersSelect<true>;
+    'delivery-reports': DeliveryReportsSelect<false> | DeliveryReportsSelect<true>;
     deliveries: DeliveriesSelect<false> | DeliveriesSelect<true>;
     'delivery-bundles': DeliveryBundlesSelect<false> | DeliveryBundlesSelect<true>;
     'delivery-lines': DeliveryLinesSelect<false> | DeliveryLinesSelect<true>;
+    'delivery-assistances': DeliveryAssistancesSelect<false> | DeliveryAssistancesSelect<true>;
     'audit-logs': AuditLogsSelect<false> | AuditLogsSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
@@ -351,6 +355,25 @@ export interface GroupMember {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "delivery-reports".
+ */
+export interface DeliveryReport {
+  id: string;
+  delivery?: (string | null) | Delivery;
+  updatedAt: string;
+  createdAt: string;
+  url?: string | null;
+  thumbnailURL?: string | null;
+  filename?: string | null;
+  mimeType?: string | null;
+  filesize?: number | null;
+  width?: number | null;
+  height?: number | null;
+  focalX?: number | null;
+  focalY?: number | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "deliveries".
  */
 export interface Delivery {
@@ -365,6 +388,7 @@ export interface Delivery {
   observations?: string | null;
   recipeDiffReason?: string | null;
   operationKey: string;
+  report?: (string | null) | DeliveryReport;
   status: 'confirmed';
   updatedAt: string;
   createdAt: string;
@@ -395,6 +419,22 @@ export interface DeliveryLine {
   quantity: number;
   observation?: string | null;
   operationKey: string;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "delivery-assistances".
+ */
+export interface DeliveryAssistance {
+  id: string;
+  delivery: string | Delivery;
+  kind: 'atmospheric' | 'materials' | 'money' | 'funeral' | 'medication' | 'orthopedic';
+  description: string;
+  quantity?: number | null;
+  amountPesos?: number | null;
+  loanStatus?: ('loaned' | 'returned') | null;
+  returnedAt?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -523,6 +563,10 @@ export interface PayloadLockedDocument {
         value: string | GroupMember;
       } | null)
     | ({
+        relationTo: 'delivery-reports';
+        value: string | DeliveryReport;
+      } | null)
+    | ({
         relationTo: 'deliveries';
         value: string | Delivery;
       } | null)
@@ -533,6 +577,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'delivery-lines';
         value: string | DeliveryLine;
+      } | null)
+    | ({
+        relationTo: 'delivery-assistances';
+        value: string | DeliveryAssistance;
       } | null)
     | ({
         relationTo: 'audit-logs';
@@ -776,6 +824,24 @@ export interface GroupMembersSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "delivery-reports_select".
+ */
+export interface DeliveryReportsSelect<T extends boolean = true> {
+  delivery?: T;
+  updatedAt?: T;
+  createdAt?: T;
+  url?: T;
+  thumbnailURL?: T;
+  filename?: T;
+  mimeType?: T;
+  filesize?: T;
+  width?: T;
+  height?: T;
+  focalX?: T;
+  focalY?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "deliveries_select".
  */
 export interface DeliveriesSelect<T extends boolean = true> {
@@ -789,6 +855,7 @@ export interface DeliveriesSelect<T extends boolean = true> {
   observations?: T;
   recipeDiffReason?: T;
   operationKey?: T;
+  report?: T;
   status?: T;
   updatedAt?: T;
   createdAt?: T;
@@ -817,6 +884,21 @@ export interface DeliveryLinesSelect<T extends boolean = true> {
   quantity?: T;
   observation?: T;
   operationKey?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "delivery-assistances_select".
+ */
+export interface DeliveryAssistancesSelect<T extends boolean = true> {
+  delivery?: T;
+  kind?: T;
+  description?: T;
+  quantity?: T;
+  amountPesos?: T;
+  loanStatus?: T;
+  returnedAt?: T;
   updatedAt?: T;
   createdAt?: T;
 }

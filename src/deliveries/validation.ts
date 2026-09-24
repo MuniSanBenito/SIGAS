@@ -1,10 +1,13 @@
 import { DeliveryError } from './errors'
-import type {
-  ConfirmDeliveryInput,
-  DeliveryBundleSelection,
-  DeliveryRealLine,
-  ProposalInput,
-  ProposedLine,
+import {
+  assistanceKinds,
+  type AssistanceKind,
+  type ConfirmDeliveryInput,
+  type DeliveryAssistanceInput,
+  type DeliveryBundleSelection,
+  type DeliveryRealLine,
+  type ProposalInput,
+  type ProposedLine,
 } from './types'
 
 export { DeliveryError }
@@ -76,6 +79,58 @@ function parseRealLine(value: unknown): DeliveryRealLine {
   }
 }
 
+const quantityKinds = new Set<AssistanceKind>(['materials', 'funeral', 'medication', 'orthopedic'])
+
+function parseAssistance(value: unknown): DeliveryAssistanceInput {
+  if (!isRecord(value)) {
+    throw new DeliveryError('VALIDATION_ERROR', 'Cada asistencia debe ser un objeto.', 422)
+  }
+  const kind = requiredString(value.kind, 'kind')
+  if (!assistanceKinds.includes(kind as AssistanceKind)) {
+    throw new DeliveryError('VALIDATION_ERROR', 'Tipo de asistencia no válido.', 422)
+  }
+  const assistanceKind = kind as AssistanceKind
+  const description = requiredString(value.description, 'description')
+  const hasQuantity = value.quantity !== undefined && value.quantity !== null && value.quantity !== ''
+  const hasAmount = value.amountPesos !== undefined && value.amountPesos !== null && value.amountPesos !== ''
+
+  if (assistanceKind === 'money') {
+    if (hasQuantity) {
+      throw new DeliveryError('VALIDATION_ERROR', 'El dinero no lleva cantidad.', 422)
+    }
+    return {
+      kind: assistanceKind,
+      description,
+      amountPesos: positiveInteger(value.amountPesos, 'amountPesos'),
+    }
+  }
+
+  if (hasAmount) {
+    throw new DeliveryError('VALIDATION_ERROR', 'Esta asistencia no lleva monto.', 422)
+  }
+
+  if (assistanceKind === 'atmospheric') {
+    if (hasQuantity) {
+      throw new DeliveryError('VALIDATION_ERROR', 'El subsidio atmosférico no lleva cantidad.', 422)
+    }
+    return { kind: assistanceKind, description }
+  }
+
+  if (!quantityKinds.has(assistanceKind)) {
+    throw new DeliveryError('VALIDATION_ERROR', 'Tipo de asistencia no válido.', 422)
+  }
+
+  if (!hasQuantity) {
+    throw new DeliveryError('VALIDATION_ERROR', 'La cantidad es obligatoria.', 422)
+  }
+
+  return {
+    kind: assistanceKind,
+    description,
+    quantity: positiveInteger(value.quantity, 'quantity'),
+  }
+}
+
 function assertNoDuplicateBundles(bundles: DeliveryBundleSelection[]): void {
   const seen = new Set<string>()
   for (const bundle of bundles) {
@@ -120,12 +175,22 @@ export function parseConfirmDeliveryInput(input: unknown): ConfirmDeliveryInput 
     throw new DeliveryError('VALIDATION_ERROR', 'bundles debe ser un arreglo.', 422)
   }
 
-  if (!Array.isArray(input.lines)) {
-    throw new DeliveryError('VALIDATION_ERROR', 'lines debe ser un arreglo con al menos una línea real.', 422)
+  const lines = Array.isArray(input.lines) ? input.lines.map(parseRealLine) : []
+  if (!Array.isArray(input.lines) && input.lines !== undefined) {
+    throw new DeliveryError('VALIDATION_ERROR', 'lines debe ser un arreglo.', 422)
   }
-  const lines = (input.lines as unknown[]).map(parseRealLine)
-  if (lines.length === 0) {
-    throw new DeliveryError('VALIDATION_ERROR', 'La entrega debe tener al menos una línea real.', 422)
+
+  const assistances = Array.isArray(input.assistances) ? input.assistances.map(parseAssistance) : []
+  if (!Array.isArray(input.assistances) && input.assistances !== undefined) {
+    throw new DeliveryError('VALIDATION_ERROR', 'assistances debe ser un arreglo.', 422)
+  }
+
+  if (lines.length === 0 && assistances.length === 0) {
+    throw new DeliveryError(
+      'VALIDATION_ERROR',
+      'La entrega debe incluir al menos un bolsón, un producto o una asistencia.',
+      422,
+    )
   }
 
   assertNoDuplicateBundles(bundles)
@@ -150,8 +215,10 @@ export function parseConfirmDeliveryInput(input: unknown): ConfirmDeliveryInput 
     observations: optionalString(input.observations, 'observations'),
     recipeDiffReason: optionalString(input.recipeDiffReason, 'recipeDiffReason'),
     operationKey: optionalString(input.operationKey, 'operationKey', 200),
+    reportId: optionalString(input.reportId, 'reportId', 200),
     bundles,
     lines,
+    assistances,
   }
 }
 

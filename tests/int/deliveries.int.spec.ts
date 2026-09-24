@@ -1,3 +1,10 @@
+/**
+ * @vitest-environment node
+ */
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { getPayload, type Payload } from 'payload'
 
@@ -7,6 +14,7 @@ import {
   buildProposal,
   confirmDelivery,
   listDeliveryCatalog,
+  returnOrthopedicAssistance,
   type DeliveryRequest,
 } from '@/deliveries/delivery-service'
 import type { BundleVersion, Product, User } from '@/payload-types'
@@ -153,6 +161,16 @@ describe('deliveries service', () => {
 
   afterAll(async () => {
     if (!payload) return
+    await payload.delete({
+      collection: 'delivery-assistances',
+      where: { delivery: { in: createdDeliveryIds.length > 0 ? createdDeliveryIds : ['missing'] } },
+      overrideAccess: true,
+    })
+    await payload.delete({
+      collection: 'delivery-reports',
+      where: { delivery: { in: createdDeliveryIds.length > 0 ? createdDeliveryIds : ['missing'] } },
+      overrideAccess: true,
+    })
     await payload.delete({
       collection: 'delivery-lines',
       where: { operationKey: { contains: runKey } },
@@ -500,5 +518,143 @@ describe('deliveries service', () => {
 
     await payload.delete({ collection: 'bundle-versions', id: historical.id, overrideAccess: true })
     await payload.delete({ collection: 'products', id: inactive.id, overrideAccess: true })
+  })
+
+  it('confirms assistance without stock and a mixed delivery only discounts products', async () => {
+    const req = { payload, user: actor } as unknown as DeliveryRequest
+    const before = await payload.find({
+      collection: 'stock-movements',
+      limit: 1,
+      overrideAccess: true,
+      where: { product: { equals: product.id }, reason: { equals: 'delivery' } },
+    })
+
+    const assistanceOnly = await confirmDelivery(req, {
+      groupId,
+      receiverContributorId: 'contrib-1',
+      receiverIsThirdParty: false,
+      deliveryDate: '2026-09-20',
+      operationKey: `${runKey}-assist-only`,
+      bundles: [],
+      lines: [],
+      assistances: [
+        { kind: 'atmospheric', description: 'Temporal de septiembre' },
+        { kind: 'money', description: 'Ayuda extraordinaria', amountPesos: 8000 },
+        { kind: 'orthopedic', description: 'Muletas', quantity: 1 },
+      ],
+    })
+    createdDeliveryIds.push(assistanceOnly.delivery.id)
+
+    expect(assistanceOnly.lineCount).toBe(0)
+    expect(assistanceOnly.assistanceCount).toBe(3)
+    expect(assistanceOnly.assistances.find((item) => item.kind === 'orthopedic')?.loanStatus).toBe('loaned')
+
+    const afterAssistance = await payload.find({
+      collection: 'stock-movements',
+      limit: 1,
+      overrideAccess: true,
+      where: { product: { equals: product.id }, reason: { equals: 'delivery' } },
+    })
+    expect(afterAssistance.totalDocs).toBe(before.totalDocs)
+
+    const balanceBefore = await payload.find({
+      collection: 'stock-balances',
+      limit: 1,
+      overrideAccess: true,
+      where: { balanceKey: { equals: `${product.id}:general` } },
+    })
+    const quantityBefore = balanceBefore.docs[0]?.quantity
+
+    const mixed = await confirmDelivery(req, {
+      groupId,
+      receiverContributorId: 'contrib-1',
+      receiverIsThirdParty: false,
+      deliveryDate: '2026-09-21',
+      operationKey: `${runKey}-mixed`,
+      bundles: [],
+      lines: [{ productId: product.id, quantity: 1 }],
+      assistances: [{ kind: 'funeral', description: 'Cajón estándar', quantity: 1 }],
+    })
+    createdDeliveryIds.push(mixed.delivery.id)
+
+    const balanceAfter = await payload.find({
+      collection: 'stock-balances',
+      limit: 1,
+      overrideAccess: true,
+      where: { balanceKey: { equals: `${product.id}:general` } },
+    })
+    expect(balanceAfter.docs[0]?.quantity).toBe((quantityBefore ?? 0) - 1)
+
+    const loan = assistanceOnly.assistances.find((item) => item.kind === 'orthopedic')
+    const returned = await returnOrthopedicAssistance(req, assistanceOnly.delivery.id, loan?.id ?? '')
+    expect(returned.assistances.find((item) => item.id === loan?.id)?.loanStatus).toBe('returned')
+
+    const balanceAfterReturn = await payload.find({
+      collection: 'stock-balances',
+      limit: 1,
+      overrideAccess: true,
+      where: { balanceKey: { equals: `${product.id}:general` } },
+    })
+    expect(balanceAfterReturn.docs[0]?.quantity).toBe(balanceAfter.docs[0]?.quantity)
+
+    await expect(returnOrthopedicAssistance(req, assistanceOnly.delivery.id, loan?.id ?? '')).rejects.toMatchObject({
+      code: 'CONFLICT',
+      status: 409,
+    })
+  })
+
+  it('links an optional report and keeps it out of public media', async () => {
+    const req = { payload, user: actor } as unknown as DeliveryRequest
+    const mediaBefore = await payload.find({ collection: 'media', limit: 1, overrideAccess: true })
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      'base64',
+    )
+    const dir = mkdtempSync(path.join(tmpdir(), 'sigas-report-'))
+    const filePath = path.join(dir, 'informe.png')
+    writeFileSync(filePath, png)
+    const report = await payload.create({
+      collection: 'delivery-reports',
+      data: {},
+      filePath,
+      overrideAccess: true,
+    })
+
+    const confirmed = await confirmDelivery(req, {
+      groupId,
+      receiverContributorId: 'contrib-1',
+      receiverIsThirdParty: false,
+      deliveryDate: '2026-09-22',
+      operationKey: `${runKey}-report`,
+      reportId: report.id,
+      bundles: [],
+      lines: [],
+      assistances: [{ kind: 'medication', description: 'Ibuprofeno', quantity: 2 }],
+    })
+    createdDeliveryIds.push(confirmed.delivery.id)
+
+    expect(confirmed.report?.id).toBe(report.id)
+    expect(confirmed.report?.mimeType).toBe('image/png')
+
+    const linked = await payload.findByID({
+      collection: 'delivery-reports',
+      depth: 0,
+      id: report.id,
+      overrideAccess: true,
+    })
+    expect(linked.delivery).toBe(confirmed.delivery.id)
+
+    const mediaAfter = await payload.find({ collection: 'media', limit: 1, overrideAccess: true })
+    expect(mediaAfter.totalDocs).toBe(mediaBefore.totalDocs)
+
+    await expect(
+      payload.find({
+        collection: 'delivery-reports',
+        overrideAccess: false,
+        user: stockActor,
+        where: { id: { equals: report.id } },
+      }),
+    ).rejects.toThrow()
+    rmSync(dir, { force: true, recursive: true })
   })
 })

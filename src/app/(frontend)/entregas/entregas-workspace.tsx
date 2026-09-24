@@ -60,6 +60,49 @@ type DeliveryListItem = {
   bundleCount: number
   lineCount: number
   totalUnits: number
+  assistanceCount: number
+  assistances: AssistanceView[]
+  report: ReportView | null
+}
+
+type AssistanceView = {
+  id: string
+  kind: string
+  description: string
+  quantity?: number | null
+  amountPesos?: number | null
+  loanStatus?: 'loaned' | 'returned' | null
+  returnedAt?: string | null
+}
+
+type ReportView = {
+  id: string
+  filename?: string | null
+  mimeType?: string | null
+  url?: string | null
+} | null
+
+type DraftAssistance = {
+  key: string
+  kind: string
+  description: string
+  quantity?: number
+  amountPesos?: number
+}
+
+const assistanceKindOptions = [
+  { label: 'Subsidio atmosférico', value: 'atmospheric' },
+  { label: 'Materiales', value: 'materials' },
+  { label: 'Dinero', value: 'money' },
+  { label: 'Sepelio', value: 'funeral' },
+  { label: 'Medicamento', value: 'medication' },
+  { label: 'Préstamo ortopédico', value: 'orthopedic' },
+] as const
+
+const quantityKinds = new Set(['materials', 'funeral', 'medication', 'orthopedic'])
+
+function assistanceKindLabel(kind: string): string {
+  return assistanceKindOptions.find((item) => item.value === kind)?.label ?? kind
 }
 
 type BundleVersionOption = {
@@ -148,7 +191,7 @@ function DeliveriesListPanel({ onCreate, onOpen }: { onCreate: () => void; onOpe
           <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Acción social</p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight text-content sm:text-4xl">Entregas</h1>
           <p className="mt-3 max-w-2xl text-base leading-7 text-content-muted">
-            Asistencia confirmada a grupos familiares con salida real de stock.
+            Asistencia confirmada a grupos familiares: bolsones, stock y ayudas que no salen del depósito.
           </p>
         </div>
         <button className="btn btn-primary min-h-11 gap-2 self-start sm:self-auto" onClick={onCreate} type="button">
@@ -187,6 +230,7 @@ function DeliveriesListPanel({ onCreate, onOpen }: { onCreate: () => void; onOpe
                   <th>Grupo</th>
                   <th>Líneas</th>
                   <th>Unidades</th>
+                  <th>Asistencias</th>
                   <th>Confirmada</th>
                   <th><span className="sr-only">Acciones</span></th>
                 </tr>
@@ -194,7 +238,7 @@ function DeliveriesListPanel({ onCreate, onOpen }: { onCreate: () => void; onOpe
               <tbody>
                 {docs.length === 0 ? (
                   <tr>
-                    <td className="py-12 text-center text-content-muted" colSpan={6}>
+                    <td className="py-12 text-center text-content-muted" colSpan={7}>
                       Todavía no hay entregas confirmadas.
                     </td>
                   </tr>
@@ -209,6 +253,7 @@ function DeliveriesListPanel({ onCreate, onOpen }: { onCreate: () => void; onOpe
                       </td>
                       <td>{item.lineCount}</td>
                       <td>{item.totalUnits}</td>
+                      <td>{item.assistanceCount}</td>
                       <td>{new Date(item.delivery.confirmedAt).toLocaleString('es-AR')}</td>
                       <td>
                         <button className="btn btn-ghost btn-sm" onClick={() => onOpen(item.delivery.id)} type="button">
@@ -247,6 +292,7 @@ function DeliveryDetailPanel({ deliveryId, onBack }: { deliveryId: string; onBac
   const [group, setGroup] = useState<GroupView | null>(null)
   const [receiver, setReceiver] = useState<Contribuyente | null>(null)
   const [loading, setLoading] = useState(true)
+  const [returningId, setReturningId] = useState('')
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -284,6 +330,24 @@ function DeliveryDetailPanel({ deliveryId, onBack }: { deliveryId: string; onBac
     return () => { cancelled = true }
   }, [deliveryId])
 
+  async function markReturned(assistanceId: string) {
+    setReturningId(assistanceId)
+    setError('')
+    try {
+      const response = await fetch(`/api/entregas/${deliveryId}/asistencias/${assistanceId}/devolver`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(errorMessage(payload, 'No se pudo registrar la devolución.'))
+      setDetail(payload.doc)
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'No se pudo registrar la devolución.')
+    } finally {
+      setReturningId('')
+    }
+  }
+
   if (loading) {
     return (
       <main className="mx-auto flex min-h-96 w-full max-w-7xl items-center justify-center px-4">
@@ -313,7 +377,7 @@ function DeliveryDetailPanel({ deliveryId, onBack }: { deliveryId: string; onBac
           Entrega del {detail.delivery.deliveryDate}
         </h1>
         <p className="mt-2 text-sm text-content-muted">
-          {detail.lineCount} líneas · {detail.totalUnits} unidades · {detail.bundleCount} bolsones
+          {detail.lineCount} líneas · {detail.totalUnits} unidades · {detail.bundleCount} bolsones · {detail.assistanceCount} asistencias
         </p>
       </div>
 
@@ -346,8 +410,50 @@ function DeliveryDetailPanel({ deliveryId, onBack }: { deliveryId: string; onBac
           {detail.delivery.observations && (
             <p className="mt-2 text-sm text-content-muted">{detail.delivery.observations}</p>
           )}
+          {detail.report?.url && (
+            <a className="btn btn-outline btn-sm mt-3" href={detail.report.url} rel="noreferrer" target="_blank">
+              Descargar informe
+            </a>
+          )}
         </article>
       </section>
+
+      {detail.assistances.length > 0 && (
+        <section className="mt-8 rounded-box border border-line bg-surface p-5 shadow-sm">
+          <h2 className="text-lg font-bold text-content">Asistencias sin stock</h2>
+          <ul className="mt-4 space-y-3">
+            {detail.assistances.map((assistance) => (
+              <li className="flex flex-col gap-2 rounded-box border border-line bg-page px-4 py-3 sm:flex-row sm:items-center sm:justify-between" key={assistance.id}>
+                <div>
+                  <p className="font-semibold text-content">{assistanceKindLabel(assistance.kind)}</p>
+                  <p className="text-sm text-content-muted">{assistance.description}</p>
+                  {assistance.quantity != null && (
+                    <p className="text-sm text-content-muted">Cantidad: {assistance.quantity}</p>
+                  )}
+                  {assistance.amountPesos != null && (
+                    <p className="text-sm text-content-muted">Monto: ${assistance.amountPesos.toLocaleString('es-AR')}</p>
+                  )}
+                </div>
+                {assistance.kind === 'orthopedic' && assistance.loanStatus !== 'returned' && (
+                  <button
+                    className="btn btn-outline btn-sm"
+                    disabled={returningId === assistance.id}
+                    onClick={() => void markReturned(assistance.id)}
+                    type="button"
+                  >
+                    {returningId === assistance.id ? 'Registrando…' : 'Registrar devolución'}
+                  </button>
+                )}
+                {assistance.kind === 'orthopedic' && assistance.loanStatus === 'returned' && (
+                  <span className="badge badge-success">
+                    Devuelto {assistance.returnedAt ? new Date(assistance.returnedAt).toLocaleString('es-AR') : ''}
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </main>
   )
 }
@@ -363,6 +469,8 @@ function CreateDeliveryPanel({ onBack, onCreated }: { onBack: () => void; onCrea
   const [products, setProducts] = useState<ProductOption[]>([])
   const [selectedBundles, setSelectedBundles] = useState<{ bundleVersionId: string; quantity: number }[]>([])
   const [selectedLoose, setSelectedLoose] = useState<{ productId: string; quantity: number }[]>([])
+  const [assistances, setAssistances] = useState<DraftAssistance[]>([])
+  const [reportFile, setReportFile] = useState<File | null>(null)
   const [lines, setLines] = useState<EditableLine[]>([])
   const [linesDirty, setLinesDirty] = useState(false)
   const [deliveryDate, setDeliveryDate] = useState(todayKey())
@@ -437,6 +545,24 @@ function CreateDeliveryPanel({ onBack, onCreated }: { onBack: () => void; onCrea
     setSaving(true)
     setError('')
     try {
+      let reportId: string | undefined
+      if (reportFile) {
+        const form = new FormData()
+        form.append('file', reportFile)
+        const upload = await fetch('/api/delivery-reports', {
+          method: 'POST',
+          credentials: 'include',
+          body: form,
+        })
+        const uploaded = await upload.json().catch(() => null)
+        if (!upload.ok) throw new Error(errorMessage(uploaded, 'No se pudo adjuntar el informe.'))
+        const uploadedId = uploaded?.doc?.id
+        if (typeof uploadedId !== 'string' || !uploadedId) {
+          throw new Error('No se pudo adjuntar el informe.')
+        }
+        reportId = uploadedId
+      }
+
       const response = await fetch('/api/entregas', {
         method: 'POST',
         credentials: 'include',
@@ -449,6 +575,7 @@ function CreateDeliveryPanel({ onBack, onCreated }: { onBack: () => void; onCrea
           deliveryDate,
           observations: observations.trim() || undefined,
           recipeDiffReason: recipeDiffReason.trim() || undefined,
+          reportId,
           bundles: selectedBundles,
           lines: lines.map((line) => ({
             productId: line.productId,
@@ -456,6 +583,12 @@ function CreateDeliveryPanel({ onBack, onCreated }: { onBack: () => void; onCrea
             quantity: line.quantity,
             bundleVersionId: line.bundleVersionId,
             observation: line.observation.trim() || undefined,
+          })),
+          assistances: assistances.map((item) => ({
+            kind: item.kind,
+            description: item.description,
+            ...(item.quantity === undefined ? {} : { quantity: item.quantity }),
+            ...(item.amountPesos === undefined ? {} : { amountPesos: item.amountPesos }),
           })),
         }),
       })
@@ -516,13 +649,23 @@ function CreateDeliveryPanel({ onBack, onCreated }: { onBack: () => void; onCrea
 
       {step === 3 && (
         <ContentPicker
+          assistances={assistances}
           bundleVersions={bundleVersions}
           loadingProposal={loadingProposal}
           onBack={() => setStep(2)}
-          onPropose={() => void loadProposal()}
+          onPropose={() => {
+            if (selectedBundles.length === 0 && selectedLoose.length === 0) {
+              setLines([])
+              setLinesDirty(false)
+              setStep(4)
+              return
+            }
+            void loadProposal()
+          }}
           products={products}
           selectedBundles={selectedBundles}
           selectedLoose={selectedLoose}
+          setAssistances={setAssistances}
           setSelectedBundles={setSelectedBundles}
           setSelectedLoose={setSelectedLoose}
         />
@@ -530,6 +673,7 @@ function CreateDeliveryPanel({ onBack, onCreated }: { onBack: () => void; onCrea
 
       {step === 4 && (
         <RealLinesReview
+          assistances={assistances}
           deliveryDate={deliveryDate}
           lines={lines}
           linesDirty={linesDirty}
@@ -537,11 +681,13 @@ function CreateDeliveryPanel({ onBack, onCreated }: { onBack: () => void; onCrea
           onBack={() => setStep(3)}
           onConfirm={() => void confirm()}
           recipeDiffReason={recipeDiffReason}
+          reportFile={reportFile}
           saving={saving}
           setDeliveryDate={setDeliveryDate}
           setLines={(next) => { setLines(next); setLinesDirty(true) }}
           setObservations={setObservations}
           setRecipeDiffReason={setRecipeDiffReason}
+          setReportFile={setReportFile}
         />
       )}
     </main>
@@ -788,6 +934,7 @@ function ReceiverPicker(props: {
 }
 
 function ContentPicker(props: {
+  assistances: DraftAssistance[]
   bundleVersions: BundleVersionOption[]
   loadingProposal: boolean
   onBack: () => void
@@ -795,6 +942,7 @@ function ContentPicker(props: {
   products: ProductOption[]
   selectedBundles: { bundleVersionId: string; quantity: number }[]
   selectedLoose: { productId: string; quantity: number }[]
+  setAssistances: (value: DraftAssistance[]) => void
   setSelectedBundles: (value: { bundleVersionId: string; quantity: number }[]) => void
   setSelectedLoose: (value: { productId: string; quantity: number }[]) => void
 }) {
@@ -802,6 +950,11 @@ function ContentPicker(props: {
   const [bundleQty, setBundleQty] = useState(1)
   const [productId, setProductId] = useState(props.products[0]?.id ?? '')
   const [productQty, setProductQty] = useState(1)
+  const [kind, setKind] = useState<string>(assistanceKindOptions[0].value)
+  const [description, setDescription] = useState('')
+  const [quantity, setQuantity] = useState(1)
+  const [amountPesos, setAmountPesos] = useState(1)
+  const [assistanceError, setAssistanceError] = useState('')
 
   useEffect(() => {
     if (!props.bundleVersions.some((item) => item.id === bundleId)) {
@@ -815,10 +968,38 @@ function ContentPicker(props: {
     }
   }, [productId, props.products])
 
-  const canPropose = props.selectedBundles.length > 0 || props.selectedLoose.length > 0
+  const canPropose = props.selectedBundles.length > 0 || props.selectedLoose.length > 0 || props.assistances.length > 0
+
+  function addAssistance() {
+    const trimmed = description.trim()
+    if (!trimmed) {
+      setAssistanceError('La descripción es obligatoria.')
+      return
+    }
+    if (kind === 'money' && (!Number.isInteger(amountPesos) || amountPesos < 1)) {
+      setAssistanceError('El monto en pesos es obligatorio.')
+      return
+    }
+    if (quantityKinds.has(kind) && (!Number.isInteger(quantity) || quantity < 1)) {
+      setAssistanceError('La cantidad es obligatoria.')
+      return
+    }
+    setAssistanceError('')
+    props.setAssistances([
+      ...props.assistances,
+      {
+        key: `${kind}-${trimmed}-${props.assistances.length}`,
+        kind,
+        description: trimmed,
+        ...(quantityKinds.has(kind) ? { quantity } : {}),
+        ...(kind === 'money' ? { amountPesos } : {}),
+      },
+    ])
+    setDescription('')
+  }
 
   return (
-    <section className="mt-8 grid gap-4 lg:grid-cols-2">
+    <section className="mt-8 grid gap-4 lg:grid-cols-3">
       <article className="rounded-box border border-line bg-surface p-5 shadow-sm">
         <h2 className="text-lg font-bold text-content">Bolsones</h2>
         {props.bundleVersions.length === 0 ? (
@@ -943,7 +1124,72 @@ function ContentPicker(props: {
         )}
       </article>
 
-      <div className="flex justify-between lg:col-span-2">
+      <article className="rounded-box border border-line bg-surface p-5 shadow-sm">
+        <h2 className="text-lg font-bold text-content">Asistencia sin stock</h2>
+        <p className="mt-1 text-sm text-content-muted">No descuenta el depósito.</p>
+        <label className="form-control mt-3 gap-1">
+          <span className="label-text font-semibold">Tipo</span>
+          <select className="select select-bordered bg-page" onChange={(event) => setKind(event.target.value)} value={kind}>
+            {assistanceKindOptions.map((item) => (
+              <option key={item.value} value={item.value}>{item.label}</option>
+            ))}
+          </select>
+        </label>
+        <label className="form-control mt-3 gap-1">
+          <span className="label-text font-semibold">{kind === 'money' ? 'Concepto' : 'Descripción'}</span>
+          <input className="input input-bordered bg-page" onChange={(event) => setDescription(event.target.value)} value={description} />
+        </label>
+        {kind === 'money' && (
+          <label className="form-control mt-3 gap-1">
+            <span className="label-text font-semibold">Monto en pesos</span>
+            <input
+              className="input input-bordered bg-page"
+              min={1}
+              onChange={(event) => setAmountPesos(Math.max(1, Number(event.target.value) || 1))}
+              type="number"
+              value={amountPesos}
+            />
+          </label>
+        )}
+        {quantityKinds.has(kind) && (
+          <label className="form-control mt-3 gap-1">
+            <span className="label-text font-semibold">Cantidad</span>
+            <input
+              className="input input-bordered bg-page"
+              min={1}
+              onChange={(event) => setQuantity(Math.max(1, Number(event.target.value) || 1))}
+              type="number"
+              value={quantity}
+            />
+          </label>
+        )}
+        {assistanceError && <p className="mt-2 text-sm text-error">{assistanceError}</p>}
+        <button className="btn btn-outline btn-sm mt-3" onClick={addAssistance} type="button">
+          Agregar asistencia
+        </button>
+        {props.assistances.length > 0 && (
+          <ul className="mt-3 space-y-2">
+            {props.assistances.map((item) => (
+              <li className="flex items-center justify-between gap-2 rounded-box border border-line bg-page px-4 py-2 text-sm" key={item.key}>
+                <span>
+                  {assistanceKindLabel(item.kind)} · {item.description}
+                  {item.quantity != null ? ` × ${item.quantity}` : ''}
+                  {item.amountPesos != null ? ` · $${item.amountPesos.toLocaleString('es-AR')}` : ''}
+                </span>
+                <button
+                  className="btn btn-ghost btn-xs"
+                  onClick={() => props.setAssistances(props.assistances.filter((entry) => entry.key !== item.key))}
+                  type="button"
+                >
+                  Quitar
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </article>
+
+      <div className="flex justify-between lg:col-span-3">
         <button className="btn btn-ghost" onClick={props.onBack} type="button">Atrás</button>
         <button className="btn btn-primary" disabled={!canPropose || props.loadingProposal} onClick={props.onPropose} type="button">
           {props.loadingProposal ? 'Armando…' : 'Ver propuesta'}
@@ -953,26 +1199,45 @@ function ContentPicker(props: {
   )
 }
 
-function RealLinesReview(props: {  deliveryDate: string
+function RealLinesReview(props: {
+  assistances: DraftAssistance[]
+  deliveryDate: string
   lines: EditableLine[]
   linesDirty: boolean
   observations: string
   onBack: () => void
   onConfirm: () => void
   recipeDiffReason: string
+  reportFile: File | null
   saving: boolean
   setDeliveryDate: (value: string) => void
   setLines: (value: EditableLine[]) => void
   setObservations: (value: string) => void
   setRecipeDiffReason: (value: string) => void
+  setReportFile: (value: File | null) => void
 }) {
   return (
     <section className="mt-8 rounded-box border border-line bg-surface p-5 shadow-sm">
       <h2 className="text-lg font-bold text-content">4. Líneas reales y confirmación</h2>
       <p className="mt-1 text-sm text-content-muted">
-        Ajustá cantidades y, si querés, elegí el lote. Solo se descuenta lo que confirmes acá.
+        {props.lines.length > 0
+          ? 'Ajustá cantidades y, si querés, elegí el lote. Solo se descuenta lo que confirmes acá.'
+          : 'Esta entrega no descuenta stock.'}
       </p>
 
+      {props.assistances.length > 0 && (
+        <ul className="mt-4 space-y-2">
+          {props.assistances.map((item) => (
+            <li className="rounded-box border border-line bg-page px-4 py-2 text-sm" key={item.key}>
+              {assistanceKindLabel(item.kind)} · {item.description}
+              {item.quantity != null ? ` × ${item.quantity}` : ''}
+              {item.amountPesos != null ? ` · $${item.amountPesos.toLocaleString('es-AR')}` : ''}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {props.lines.length > 0 && (
       <div className="mt-4 overflow-x-auto rounded-box border border-line">
         <table className="table table-zebra">
           <caption className="sr-only">Líneas reales de la entrega</caption>
@@ -1032,6 +1297,7 @@ function RealLinesReview(props: {  deliveryDate: string
           </tbody>
         </table>
       </div>
+      )}
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         <label className="form-control gap-1">
@@ -1043,18 +1309,30 @@ function RealLinesReview(props: {  deliveryDate: string
             value={props.deliveryDate}
           />
         </label>
-        <label className="form-control gap-1">
-          <span className="label-text font-semibold">
-            Motivo de diferencia con la receta {props.linesDirty ? '' : '(opcional)'}
-          </span>
-          <input
-            className="input input-bordered bg-page"
-            onChange={(event) => props.setRecipeDiffReason(event.target.value)}
-            placeholder="Ej. faltó stock de un producto"
-            value={props.recipeDiffReason}
-          />
-        </label>
+        {props.lines.length > 0 && (
+          <label className="form-control gap-1">
+            <span className="label-text font-semibold">
+              Motivo de diferencia con la receta {props.linesDirty ? '' : '(opcional)'}
+            </span>
+            <input
+              className="input input-bordered bg-page"
+              onChange={(event) => props.setRecipeDiffReason(event.target.value)}
+              placeholder="Ej. faltó stock de un producto"
+              value={props.recipeDiffReason}
+            />
+          </label>
+        )}
       </div>
+      <label className="form-control mt-4 gap-1">
+        <span className="label-text font-semibold">Informe de sustento (opcional)</span>
+        <input
+          accept="application/pdf,image/jpeg,image/png,image/webp"
+          className="file-input file-input-bordered bg-page"
+          onChange={(event) => props.setReportFile(event.target.files?.[0] ?? null)}
+          type="file"
+        />
+        {props.reportFile && <span className="text-sm text-content-muted">{props.reportFile.name}</span>}
+      </label>
       <label className="form-control mt-4 gap-1">
         <span className="label-text font-semibold">Observaciones</span>
         <textarea

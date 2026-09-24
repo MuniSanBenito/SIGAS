@@ -49,11 +49,72 @@ describe('delivery validation', () => {
     expect(result.receiverAuthorizationReason).toContain('Vecina')
   })
 
-  it('requires at least one real line with positive quantities', () => {
-    expect(() => parseConfirmDeliveryInput({ ...base, lines: [] })).toThrow('al menos una línea real')
+  it('requires stock lines or an assistance', () => {
+    expect(() => parseConfirmDeliveryInput({ ...base, bundles: [], lines: [], assistances: [] })).toThrow(
+      'al menos un bolsón, un producto o una asistencia',
+    )
     expect(() => parseConfirmDeliveryInput({ ...base, lines: [{ productId: 'p', quantity: 0 }] })).toThrow(
       'entero positivo',
     )
+  })
+
+  it('accepts an assistance-only delivery and checks fields by kind', () => {
+    const atmospheric = parseConfirmDeliveryInput({
+      ...base,
+      bundles: [],
+      lines: [],
+      assistances: [{ kind: 'atmospheric', description: 'Temporal de septiembre' }],
+    })
+    expect(atmospheric.assistances).toEqual([{ kind: 'atmospheric', description: 'Temporal de septiembre' }])
+
+    const money = parseConfirmDeliveryInput({
+      ...base,
+      bundles: [],
+      lines: [],
+      assistances: [{ kind: 'money', description: 'Ayuda extraordinaria', amountPesos: 15000 }],
+    })
+    expect(money.assistances[0]?.amountPesos).toBe(15000)
+
+    expect(() =>
+      parseConfirmDeliveryInput({
+        ...base,
+        bundles: [],
+        lines: [],
+        assistances: [{ kind: 'atmospheric', description: 'Temporal', amountPesos: 1000 }],
+      }),
+    ).toThrow('no lleva monto')
+
+    expect(() =>
+      parseConfirmDeliveryInput({
+        ...base,
+        bundles: [],
+        lines: [],
+        assistances: [{ kind: 'materials', description: 'Chapas' }],
+      }),
+    ).toThrow('cantidad')
+
+    expect(() =>
+      parseConfirmDeliveryInput({
+        ...base,
+        bundles: [],
+        lines: [],
+        assistances: [{ kind: 'money', description: 'Ayuda' }],
+      }),
+    ).toThrow('amountPesos')
+
+    expect(() =>
+      parseConfirmDeliveryInput({
+        ...base,
+        bundles: [],
+        lines: [],
+        assistances: [{ kind: 'orthopedic', description: 'Muletas', quantity: 1, amountPesos: 10 }],
+      }),
+    ).toThrow('no lleva monto')
+  })
+
+  it('keeps an optional report id', () => {
+    const result = parseConfirmDeliveryInput({ ...base, reportId: 'report-1' })
+    expect(result.reportId).toBe('report-1')
   })
 
   it('rejects duplicated real lines', () => {

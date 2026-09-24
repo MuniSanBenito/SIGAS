@@ -8,6 +8,7 @@ import {
   getDeliveryById,
   listDeliveries,
   listDeliveryCatalog,
+  returnOrthopedicAssistance,
   type DeliveryRequest,
 } from '@/deliveries/delivery-service'
 import type { User } from '@/payload-types'
@@ -84,10 +85,27 @@ async function confirmDeliveryEndpoint(req: EntregaRequest): Promise<Response> {
   }
 }
 
+async function returnAssistanceEndpoint(req: EntregaRequest): Promise<Response> {
+  try {
+    authorize(req)
+    const deliveryId = req.routeParams?.id ?? ''
+    const assistanceId = req.routeParams?.assistanceId ?? ''
+    const delivery = await returnOrthopedicAssistance(req, deliveryId, assistanceId)
+    return Response.json({ doc: delivery })
+  } catch (error) {
+    return deliveryErrorResponse(error)
+  }
+}
+
 export const deliveryEndpoints: Endpoint[] = [
   { handler: (req) => listDeliveriesEndpoint(req as EntregaRequest), method: 'get', path: '/entregas' },
   { handler: (req) => catalogEndpoint(req as EntregaRequest), method: 'get', path: '/entregas/catalogo' },
   { handler: (req) => proposalEndpoint(req as EntregaRequest), method: 'post', path: '/entregas/propuesta' },
   { handler: (req) => confirmDeliveryEndpoint(req as EntregaRequest), method: 'post', path: '/entregas' },
+  {
+    handler: (req) => returnAssistanceEndpoint(req as EntregaRequest),
+    method: 'post',
+    path: '/entregas/:id/asistencias/:assistanceId/devolver',
+  },
   { handler: (req) => getDeliveryEndpoint(req as EntregaRequest), method: 'get', path: '/entregas/:id' },
 ]

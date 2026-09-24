@@ -8,6 +8,8 @@ import type {
   Bundle,
   BundleVersion,
   Delivery,
+  DeliveryAssistance,
+  DeliveryReport,
   FamilyGroup,
   GroupMember,
   Product,
@@ -428,11 +430,97 @@ async function validateLineLot(
   }
 }
 
+export type HydratedReport = {
+  id: string
+  filename?: string | null
+  mimeType?: string | null
+  url?: string | null
+}
+
 export type HydratedDelivery = {
   delivery: Delivery
   bundleCount: number
   lineCount: number
   totalUnits: number
+  assistanceCount: number
+  assistances: DeliveryAssistance[]
+  report: HydratedReport | null
+}
+
+function toHydratedReport(report: DeliveryReport | null): HydratedReport | null {
+  if (!report) return null
+  return {
+    id: report.id,
+    filename: report.filename,
+    mimeType: report.mimeType,
+    url: report.url,
+  }
+}
+
+async function loadReport(req: DeliveryRequest, report: Delivery['report']): Promise<HydratedReport | null> {
+  if (!report) return null
+  if (typeof report === 'object') return toHydratedReport(report)
+  try {
+    const doc = (await req.payload.findByID({
+      collection: 'delivery-reports',
+      depth: 0,
+      id: report,
+      overrideAccess: true,
+      req,
+    })) as DeliveryReport
+    return toHydratedReport(doc)
+  } catch {
+    return null
+  }
+}
+
+async function loadAssistances(req: DeliveryRequest, deliveryId: string): Promise<DeliveryAssistance[]> {
+  const result = await req.payload.find({
+    collection: 'delivery-assistances',
+    depth: 0,
+    limit: 100,
+    overrideAccess: true,
+    req,
+    sort: 'createdAt',
+    where: { delivery: { equals: deliveryId } },
+  })
+  return result.docs as DeliveryAssistance[]
+}
+
+async function hydrateDelivery(
+  req: DeliveryRequest,
+  delivery: Delivery,
+): Promise<HydratedDelivery> {
+  const [bundlesResult, linesResult, assistances, report] = await Promise.all([
+    req.payload.find({
+      collection: 'delivery-bundles',
+      depth: 0,
+      limit: 100,
+      overrideAccess: true,
+      req,
+      where: { delivery: { equals: delivery.id } },
+    }),
+    req.payload.find({
+      collection: 'delivery-lines',
+      depth: 0,
+      limit: 500,
+      overrideAccess: true,
+      req,
+      where: { delivery: { equals: delivery.id } },
+    }),
+    loadAssistances(req, delivery.id),
+    loadReport(req, delivery.report),
+  ])
+  const lines = linesResult.docs as { quantity: number }[]
+  return {
+    delivery,
+    bundleCount: bundlesResult.totalDocs,
+    lineCount: linesResult.totalDocs,
+    totalUnits: lines.reduce((total, line) => total + line.quantity, 0),
+    assistanceCount: assistances.length,
+    assistances,
+    report,
+  }
 }
 
 export async function getDeliveryById(req: DeliveryRequest, deliveryId: string): Promise<HydratedDelivery> {
@@ -450,33 +538,7 @@ export async function getDeliveryById(req: DeliveryRequest, deliveryId: string):
     throw new DeliveryError('NOT_FOUND', 'Entrega no encontrada.', 404)
   }
   if (!delivery) throw new DeliveryError('NOT_FOUND', 'Entrega no encontrada.', 404)
-
-  const [bundlesResult, linesResult] = await Promise.all([
-    req.payload.find({
-      collection: 'delivery-bundles',
-      depth: 0,
-      limit: 100,
-      overrideAccess: true,
-      req,
-      where: { delivery: { equals: delivery.id } },
-    }),
-    req.payload.find({
-      collection: 'delivery-lines',
-      depth: 0,
-      limit: 500,
-      overrideAccess: true,
-      req,
-      where: { delivery: { equals: delivery.id } },
-    }),
-  ])
-
-  const lines = linesResult.docs as { quantity: number }[]
-  return {
-    delivery,
-    bundleCount: bundlesResult.totalDocs,
-    lineCount: linesResult.totalDocs,
-    totalUnits: lines.reduce((total, line) => total + line.quantity, 0),
-  }
+  return hydrateDelivery(req, delivery)
 }
 
 export async function listDeliveries(
@@ -493,33 +555,7 @@ export async function listDeliveries(
     req,
     sort: '-confirmedAt',
   })
-  const docs = await Promise.all(
-    (result.docs as Delivery[]).map(async (delivery) => {
-      const linesResult = await req.payload.find({
-        collection: 'delivery-lines',
-        depth: 0,
-        limit: 500,
-        overrideAccess: true,
-        req,
-        where: { delivery: { equals: delivery.id } },
-      })
-      const bundlesResult = await req.payload.find({
-        collection: 'delivery-bundles',
-        depth: 0,
-        limit: 100,
-        overrideAccess: true,
-        req,
-        where: { delivery: { equals: delivery.id } },
-      })
-      const lines = linesResult.docs as { quantity: number }[]
-      return {
-        delivery,
-        bundleCount: bundlesResult.totalDocs,
-        lineCount: linesResult.totalDocs,
-        totalUnits: lines.reduce((total, line) => total + line.quantity, 0),
-      }
-    }),
-  )
+  const docs = await Promise.all((result.docs as Delivery[]).map((delivery) => hydrateDelivery(req, delivery)))
   return {
     docs,
     totalDocs: result.totalDocs,
@@ -556,6 +592,10 @@ export async function confirmDelivery(req: DeliveryRequest, input: unknown): Pro
   const group = await getActiveGroup(req, parsed.groupId)
   const members = await getActiveMembers(req, group.id)
   const memberIds = new Set(members.map((member) => member.contributorId))
+
+  if (parsed.reportId) {
+    await assertUnlinkedReport(req, parsed.reportId)
+  }
 
   if (parsed.receiverIsThirdParty) {
     await assertContributorExists(parsed.receiverContributorId)
@@ -664,6 +704,7 @@ export async function confirmDelivery(req: DeliveryRequest, input: unknown): Pro
         receiverContributorId: parsed.receiverContributorId,
         receiverIsThirdParty: parsed.receiverIsThirdParty,
         recipeDiffReason: parsed.recipeDiffReason,
+        ...(parsed.reportId ? { report: parsed.reportId } : {}),
         status: 'confirmed',
       },
       overrideAccess: true,
@@ -753,9 +794,41 @@ export async function confirmDelivery(req: DeliveryRequest, input: unknown): Pro
       }
     }
 
+    for (const assistance of parsed.assistances) {
+      await txReq.payload.create({
+        collection: 'delivery-assistances',
+        data: {
+          ...(assistance.amountPesos === undefined ? {} : { amountPesos: assistance.amountPesos }),
+          delivery: delivery.id,
+          description: assistance.description,
+          kind: assistance.kind,
+          ...(assistance.kind === 'orthopedic' ? { loanStatus: 'loaned' as const } : {}),
+          ...(assistance.quantity === undefined ? {} : { quantity: assistance.quantity }),
+        },
+        overrideAccess: true,
+        req: txReq,
+      })
+    }
+
+    if (parsed.reportId) {
+      await txReq.payload.update({
+        collection: 'delivery-reports',
+        data: { delivery: delivery.id },
+        id: parsed.reportId,
+        overrideAccess: true,
+        req: txReq,
+      })
+    }
+
     await auditDeliveryAction(txReq, actor, {
       action: 'deliveries.confirmed',
-      after: { deliveryId: delivery.id, groupId: group.id, lineCount: parsed.lines.length },
+      after: {
+        assistanceCount: parsed.assistances.length,
+        deliveryId: delivery.id,
+        groupId: group.id,
+        lineCount: parsed.lines.length,
+        reportId: parsed.reportId ?? null,
+      },
       result: 'success',
       targetId: delivery.id,
       targetType: 'delivery',
@@ -767,4 +840,72 @@ export async function confirmDelivery(req: DeliveryRequest, input: unknown): Pro
     await req.payload.db.rollbackTransaction(transactionID)
     throw error
   }
+}
+
+async function assertUnlinkedReport(req: DeliveryRequest, reportId: string): Promise<void> {
+  let report: DeliveryReport
+  try {
+    report = (await req.payload.findByID({
+      collection: 'delivery-reports',
+      depth: 0,
+      id: reportId,
+      overrideAccess: true,
+      req,
+    })) as DeliveryReport
+  } catch {
+    throw new DeliveryError('NOT_FOUND', 'Informe no encontrado.', 404)
+  }
+  if (!report) throw new DeliveryError('NOT_FOUND', 'Informe no encontrado.', 404)
+  if (report.delivery) {
+    throw new DeliveryError('CONFLICT', 'El informe ya está vinculado a una entrega.', 409)
+  }
+}
+
+export async function returnOrthopedicAssistance(
+  req: DeliveryRequest,
+  deliveryId: string,
+  assistanceId: string,
+): Promise<HydratedDelivery> {
+  const actor = assertDeliveryOperator(req)
+  await getDeliveryById(req, deliveryId)
+
+  let assistance: DeliveryAssistance
+  try {
+    assistance = (await req.payload.findByID({
+      collection: 'delivery-assistances',
+      depth: 0,
+      id: assistanceId,
+      overrideAccess: true,
+      req,
+    })) as DeliveryAssistance
+  } catch {
+    throw new DeliveryError('NOT_FOUND', 'Asistencia no encontrada.', 404)
+  }
+  if (!assistance || relationId(assistance.delivery) !== deliveryId) {
+    throw new DeliveryError('NOT_FOUND', 'Asistencia no encontrada.', 404)
+  }
+  if (assistance.kind !== 'orthopedic') {
+    throw new DeliveryError('VALIDATION_ERROR', 'Solo un préstamo ortopédico se puede devolver.', 422)
+  }
+  if (assistance.loanStatus === 'returned') {
+    throw new DeliveryError('CONFLICT', 'El elemento ya fue devuelto.', 409)
+  }
+
+  const returnedAt = new Date().toISOString()
+  await req.payload.update({
+    collection: 'delivery-assistances',
+    data: { loanStatus: 'returned', returnedAt },
+    id: assistance.id,
+    overrideAccess: true,
+    req,
+  })
+  await auditDeliveryAction(req, actor, {
+    action: 'deliveries.assistance-returned',
+    after: { assistanceId: assistance.id, loanStatus: 'returned', returnedAt },
+    before: { loanStatus: assistance.loanStatus ?? 'loaned' },
+    result: 'success',
+    targetId: deliveryId,
+    targetType: 'delivery',
+  })
+  return getDeliveryById(req, deliveryId)
 }
