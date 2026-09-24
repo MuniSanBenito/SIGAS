@@ -1,0 +1,15 @@
+node_modules
+.next
+.git
+.env
+.env.*
+media
+coverage
+test-results
+playwright-report
+blob-report
+.e2e-padron.json
+*.md
+.agents
+docs
+tasks
