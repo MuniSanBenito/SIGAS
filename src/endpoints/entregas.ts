@@ -8,6 +8,7 @@ import {
   getDeliveryById,
   listDeliveries,
   listDeliveryCatalog,
+  listGroupDeliveryHistory,
   returnOrthopedicAssistance,
   type DeliveryRequest,
 } from '@/deliveries/delivery-service'
@@ -57,6 +58,16 @@ async function getDeliveryEndpoint(req: EntregaRequest): Promise<Response> {
   }
 }
 
+async function groupHistoryEndpoint(req: EntregaRequest): Promise<Response> {
+  try {
+    authorize(req)
+    const groupId = requestUrl(req).searchParams.get('groupId') ?? ''
+    return Response.json(await listGroupDeliveryHistory(req, groupId))
+  } catch (error) {
+    return deliveryErrorResponse(error)
+  }
+}
+
 async function catalogEndpoint(req: EntregaRequest): Promise<Response> {
   try {
     authorize(req)
@@ -99,6 +110,7 @@ async function returnAssistanceEndpoint(req: EntregaRequest): Promise<Response> 
 
 export const deliveryEndpoints: Endpoint[] = [
   { handler: (req) => listDeliveriesEndpoint(req as EntregaRequest), method: 'get', path: '/entregas' },
+  { handler: (req) => groupHistoryEndpoint(req as EntregaRequest), method: 'get', path: '/entregas/historial' },
   { handler: (req) => catalogEndpoint(req as EntregaRequest), method: 'get', path: '/entregas/catalogo' },
   { handler: (req) => proposalEndpoint(req as EntregaRequest), method: 'post', path: '/entregas/propuesta' },
   { handler: (req) => confirmDeliveryEndpoint(req as EntregaRequest), method: 'post', path: '/entregas' },

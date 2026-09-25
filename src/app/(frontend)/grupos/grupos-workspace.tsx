@@ -20,6 +20,7 @@ import {
 
 import { AppDialog, AppDialogBody, AppDialogFooter } from '../app-dialog'
 import { ContribuyentesWorkspace } from './contribuyentes-workspace'
+import { GroupDeliveryHistory } from './group-delivery-history'
 import type { DraftMember, ExistingMembership, FamilyGroupView, KinshipOption } from './group-ui-types'
 
 type Tab = 'grupos' | 'contribuyentes'
@@ -771,6 +772,8 @@ function GroupDetailPanel({
           </tbody>
         </table>
       </section>
+
+      <GroupDeliveryHistory groupId={groupId} />
 
       {addMemberOpen && (
         <AddMemberDialog

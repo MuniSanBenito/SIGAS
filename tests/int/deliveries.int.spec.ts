@@ -14,6 +14,7 @@ import {
   buildProposal,
   confirmDelivery,
   listDeliveryCatalog,
+  listGroupDeliveryHistory,
   returnOrthopedicAssistance,
   type DeliveryRequest,
 } from '@/deliveries/delivery-service'
@@ -656,5 +657,70 @@ describe('deliveries service', () => {
       }),
     ).rejects.toThrow()
     rmSync(dir, { force: true, recursive: true })
+  })
+
+  it('lists what was delivered to a group and on which date', async () => {
+    const req = { payload, user: actor } as unknown as DeliveryRequest
+    await recordStockMovement(req as unknown as InventoryRequest, {
+      operationKey: `${runKey}-history-entry`,
+      movement: {
+        mode: 'entry',
+        operationalDate: '2026-08-01',
+        productId: product.id,
+        quantity: 5,
+        reason: 'purchase',
+      },
+    })
+    const older = await confirmDelivery(req, {
+      groupId,
+      receiverContributorId: 'contrib-1',
+      receiverIsThirdParty: false,
+      deliveryDate: '2026-08-02',
+      operationKey: `${runKey}-history-old`,
+      bundles: [{ bundleVersionId: bundleVersion.id, quantity: 1 }],
+      lines: [{ productId: product.id, quantity: 2, bundleVersionId: bundleVersion.id }],
+    })
+    const newer = await confirmDelivery(req, {
+      groupId,
+      receiverContributorId: 'contrib-1',
+      receiverIsThirdParty: false,
+      deliveryDate: '2026-09-20',
+      operationKey: `${runKey}-history-new`,
+      bundles: [],
+      lines: [],
+      assistances: [{ kind: 'medication', description: 'Ibuprofeno', quantity: 1 }],
+    })
+    createdDeliveryIds.push(older.delivery.id, newer.delivery.id)
+
+    const history = await listGroupDeliveryHistory(req, groupId)
+    const dates = history.docs
+      .filter((item) => item.id === older.delivery.id || item.id === newer.delivery.id)
+      .map((item) => item.deliveryDate.slice(0, 10))
+    expect(dates).toEqual(['2026-09-20', '2026-08-02'])
+
+    const olderItem = history.docs.find((item) => item.id === older.delivery.id)
+    expect(olderItem?.lines).toEqual([
+      expect.objectContaining({ productName: product.name, quantity: 2 }),
+    ])
+    expect(olderItem?.bundles).toEqual([
+      expect.objectContaining({ name: `Delivery bundle ${runKey}`, quantity: 1 }),
+    ])
+    expect(history.docs.find((item) => item.id === newer.delivery.id)?.assistances).toEqual([
+      expect.objectContaining({ kind: 'medication', description: 'Ibuprofeno', quantity: 1 }),
+    ])
+
+    const otherGroup = await payload.create({
+      collection: 'family-groups',
+      data: { referenteContributorId: 'contrib-other', startedAt: '2026-09-01', status: 'active' },
+      overrideAccess: true,
+    })
+    const otherHistory = await listGroupDeliveryHistory(req, otherGroup.id)
+    expect(otherHistory.docs).toEqual([])
+    await payload.delete({ collection: 'family-groups', id: otherGroup.id, overrideAccess: true })
+
+    await expect(listGroupDeliveryHistory({ payload, user: stockActor } as unknown as DeliveryRequest, groupId)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      status: 403,
+    })
   })
 })

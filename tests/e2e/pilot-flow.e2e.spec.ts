@@ -236,5 +236,5 @@ test('administration creates a group from the padron, stock loads a bundle, and 
   await page.getByRole('link', { name: 'Inventario', exact: true }).first().click()
   await page.getByLabel('Buscar productos').fill(productName)
   await expect(page.getByRole('heading', { name: productName })).toBeVisible()
-  await expect(page.getByText('Hay 4', { exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: productName }).locator('xpath=ancestor::article').getByText('4', { exact: true })).toBeVisible()
 })

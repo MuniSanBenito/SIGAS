@@ -230,7 +230,7 @@ export function InventoryWorkspace() {
       <section className="mt-8 rounded-box border border-line bg-surface p-4 shadow-sm sm:p-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="tabs tabs-boxed w-fit max-w-full overflow-x-auto bg-surface-alt" role="tablist" aria-label="Vistas de inventario">
-            <TabButton active={activeView === 'stock'} label="Qué hay" onClick={() => setActiveView('stock')} />
+            <TabButton active={activeView === 'stock'} label="Stock" onClick={() => setActiveView('stock')} />
             <TabButton active={activeView === 'movements'} label="Historial" onClick={() => setActiveView('movements')} />
             <TabButton active={activeView === 'bolsones'} label="Bolsones" onClick={() => setActiveView('bolsones')} />
             <TabButton active={activeView === 'catalog'} label="Catálogo" onClick={() => setActiveView('catalog')} />
@@ -457,6 +457,93 @@ function FilterChip({
   )
 }
 
+function ProductStockCard({
+  expanded,
+  onExpand,
+  onLoad,
+  product,
+}: {
+  expanded: boolean
+  onExpand: (productId: string | null) => void
+  onLoad: (intent: LoadIntent, productId?: string) => void
+  product: InventoryProduct
+}) {
+  const hasExpiringLot = product.lots.some((lot) => lot.isExpiringSoon)
+  const hasExpiredLot = product.lots.some((lot) => lot.isExpired)
+  const accent = !product.isActive
+    ? 'border-l-line'
+    : hasExpiredLot
+      ? 'border-l-error'
+      : product.isLowStock
+        ? 'border-l-warning'
+        : hasExpiringLot
+          ? 'border-l-error'
+          : 'border-l-primary'
+
+  return (
+    <article className={`rounded-box border border-line border-l-4 bg-surface ${accent}`}>
+      <button
+        aria-expanded={expanded}
+        className="flex w-full items-center gap-3 px-3 py-2.5 text-left"
+        onClick={() => onExpand(expanded ? null : product.id)}
+        type="button"
+      >
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-sm font-semibold text-content sm:text-base">{product.name}</h2>
+          <div className="mt-0.5 flex items-center gap-2">
+            <p className="truncate text-xs text-content-muted">{relationLabel(product.category, 'Sin categoría')}</p>
+            {!product.isActive && <span className="badge badge-ghost badge-xs shrink-0">{PRODUCT_ACTIVE_LABELS.inactive}</span>}
+            {product.isLowStock && (
+              <span className="badge badge-warning badge-xs shrink-0 gap-1">
+                <IconAlertTriangle aria-hidden="true" className="h-3 w-3" />
+                Bajo mínimo
+              </span>
+            )}
+            {hasExpiredLot && <span className="badge badge-error badge-xs shrink-0">Vencido</span>}
+            {hasExpiringLot && !hasExpiredLot && <span className="badge badge-error badge-xs shrink-0">Por vencer</span>}
+          </div>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="text-xs text-content-muted">Cantidad</p>
+          <p className="text-lg font-bold tabular-nums leading-none text-content">{product.totalQuantity}</p>
+        </div>
+        {expanded ? (
+          <IconChevronUp aria-hidden="true" className="h-4 w-4 shrink-0 text-content-muted" />
+        ) : (
+          <IconChevronDown aria-hidden="true" className="h-4 w-4 shrink-0 text-content-muted" />
+        )}
+      </button>
+
+      {expanded && (
+        <div className="border-t border-line px-3 pb-3 pt-2">
+          <p className="text-xs text-content-muted">Stock mínimo {product.minimumStock}</p>
+          {product.lots.length > 0 ? (
+            <ul className="mt-2 space-y-1.5 text-sm text-content-muted">
+              {product.lots.map((lot) => (
+                <li className="flex flex-wrap items-center justify-between gap-2 rounded-box bg-surface-alt px-3 py-2" key={lot.id}>
+                  <span>
+                    Lote {lot.code} · vence {lot.expirationDate.slice(0, 10)}
+                    {lot.isExpired && <span className="ml-2 font-semibold text-error">Vencido</span>}
+                    {!lot.isExpired && lot.isExpiringSoon && <span className="ml-2 font-semibold text-error">Por vencer</span>}
+                  </span>
+                  <span className="font-semibold text-content">Cantidad {lot.quantity}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-sm text-content-muted">Sin control de lote.</p>
+          )}
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button className="btn btn-outline btn-sm min-h-10" onClick={() => onLoad('entry', product.id)} type="button">Entrada</button>
+            <button className="btn btn-outline btn-sm min-h-10" onClick={() => onLoad('exit', product.id)} type="button">Salida</button>
+            <button className="btn btn-primary btn-sm min-h-10" onClick={() => onLoad('physicalCount', product.id)} type="button">Conteo</button>
+          </div>
+        </div>
+      )}
+    </article>
+  )
+}
+
 function StockView({
   expandedProductId,
   filteredProducts,
@@ -504,67 +591,16 @@ function StockView({
           <p className="mt-1 text-sm text-content-muted">Probá otro filtro o cargá el depósito desde Catálogo.</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {filteredProducts.map((product) => {
-            const isExpanded = expandedProductId === product.id
-            const hasExpiringLot = product.lots.some((lot) => lot.isExpiringSoon)
-            return (
-              <article className="rounded-box border border-line bg-surface-alt" key={product.id}>
-                <button
-                  className="flex w-full items-start justify-between gap-3 p-4 text-left"
-                  onClick={() => onExpand(isExpanded ? null : product.id)}
-                  type="button"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-bold text-content">{product.name}</h2>
-                      {!product.isActive && <span className="badge badge-ghost">{PRODUCT_ACTIVE_LABELS.inactive}</span>}
-                    </div>
-                    <p className="mt-1 text-sm text-content-muted">{relationLabel(product.category, 'Sin categoría')}</p>
-                    <div className="mt-3 flex flex-wrap items-center gap-3">
-                      <p className="text-lg font-bold text-content">Hay {product.totalQuantity}</p>
-                      {product.isLowStock && (
-                        <span className="flex items-center gap-1 text-sm font-semibold text-warning">
-                          <IconAlertTriangle aria-hidden="true" className="h-4 w-4" />
-                          Falta (mín. {product.minimumStock})
-                        </span>
-                      )}
-                      {hasExpiringLot && <span className="text-sm font-semibold text-error">Por vencer</span>}
-                    </div>
-                  </div>
-                  {isExpanded ? (
-                    <IconChevronUp aria-hidden="true" className="h-5 w-5 shrink-0 text-content-muted" />
-                  ) : (
-                    <IconChevronDown aria-hidden="true" className="h-5 w-5 shrink-0 text-content-muted" />
-                  )}
-                </button>
-
-                {isExpanded && (
-                  <div className="border-t border-line px-4 pb-4 pt-3">
-                    {product.lots.length > 0 ? (
-                      <ul className="space-y-2 text-sm text-content-muted">
-                        {product.lots.map((lot) => (
-                          <li className="flex flex-wrap items-center justify-between gap-2 rounded-box bg-surface px-3 py-2" key={lot.id}>
-                            <span>
-                              Lote {lot.code} · vence {lot.expirationDate.slice(0, 10)}
-                            </span>
-                            <span className="font-semibold text-content">Hay {lot.quantity}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-sm text-content-muted">Sin lotes controlados.</p>
-                    )}
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <button className="btn btn-outline btn-sm" onClick={() => onLoad('entry', product.id)} type="button">Sumar</button>
-                      <button className="btn btn-outline btn-sm" onClick={() => onLoad('exit', product.id)} type="button">Sacar</button>
-                      <button className="btn btn-primary btn-sm" onClick={() => onLoad('physicalCount', product.id)} type="button">Contar</button>
-                    </div>
-                  </div>
-                )}
-              </article>
-            )
-          })}
+        <div className="space-y-2">
+          {filteredProducts.map((product) => (
+            <ProductStockCard
+              expanded={expandedProductId === product.id}
+              key={product.id}
+              onExpand={onExpand}
+              onLoad={onLoad}
+              product={product}
+            />
+          ))}
         </div>
       )}
     </div>

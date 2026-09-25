@@ -42,6 +42,22 @@ describe('entrega endpoints', () => {
     expect(response.status).toBe(401)
   })
 
+  it('rejects stock users from group delivery history', async () => {
+    const response = await handler('get', '/entregas/historial')({
+      url: 'http://localhost/api/entregas/historial?groupId=group-1',
+      user: { roles: ['stock'] },
+    })
+    expect(response.status).toBe(403)
+  })
+
+  it('requires a group to consult delivery history', async () => {
+    const response = await handler('get', '/entregas/historial')({
+      url: 'http://localhost/api/entregas/historial',
+      user: { roles: ['administracion'] },
+    })
+    expect(response.status).toBe(422)
+  })
+
   it('rejects stock users from the delivery catalog', async () => {
     const response = await handler('get', '/entregas/catalogo')({
       url: 'http://localhost/api/entregas/catalogo',

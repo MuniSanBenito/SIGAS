@@ -62,7 +62,7 @@ test('stock user can create a product and record loads', async ({ page }) => {
   await productDialog.getByRole('button', { name: 'Crear producto' }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Producto creado correctamente.' })).toBeVisible()
 
-  await page.getByRole('tab', { name: 'Qué hay' }).click()
+  await page.getByRole('tab', { name: 'Stock' }).click()
   await expect(page.getByRole('heading', { name: productName })).toBeVisible()
 
   await openLoad(page)
@@ -72,7 +72,7 @@ test('stock user can create a product and record loads', async ({ page }) => {
   await loadDialog.getByLabel('Cantidad').fill('5')
   await loadDialog.getByRole('button', { name: 'Confirmar carga' }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Mercadería cargada para 1 producto.' })).toBeVisible()
-  await expect(page.getByText('Hay 5', { exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: productName }).locator('xpath=ancestor::article').getByText('5', { exact: true })).toBeVisible()
 
   await openLoad(page)
   await page.getByRole('dialog').getByRole('button', { name: 'Se perdió o venció' }).click()
@@ -80,14 +80,14 @@ test('stock user can create a product and record loads', async ({ page }) => {
   await page.getByRole('dialog').getByLabel('Cantidad').fill('2')
   await page.getByRole('dialog').getByRole('button', { name: 'Confirmar carga' }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Salida registrada para 1 producto.' })).toBeVisible()
-  await expect(page.getByText('Hay 3', { exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: productName }).locator('xpath=ancestor::article').getByText('3', { exact: true })).toBeVisible()
 
   await openLoad(page)
   await page.getByRole('dialog').getByRole('button', { name: 'Esto es lo que hay' }).click()
   await page.getByRole('dialog').getByLabel('Cuánto hay').fill('4')
   await page.getByRole('dialog').getByRole('button', { name: 'Confirmar carga' }).click()
   await expect(page.getByRole('status').filter({ hasText: 'Conteo guardado para 1 producto.' })).toBeVisible()
-  await expect(page.getByText('Hay 4', { exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('heading', { name: productName }).locator('xpath=ancestor::article').getByText('4', { exact: true })).toBeVisible()
 
   await openCatalog(page)
   await page.getByRole('button', { name: 'Dejar de usar' }).first().click()

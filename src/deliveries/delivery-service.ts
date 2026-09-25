@@ -9,6 +9,8 @@ import type {
   BundleVersion,
   Delivery,
   DeliveryAssistance,
+  DeliveryBundle,
+  DeliveryLine,
   DeliveryReport,
   FamilyGroup,
   GroupMember,
@@ -908,4 +910,175 @@ export async function returnOrthopedicAssistance(
     targetType: 'delivery',
   })
   return getDeliveryById(req, deliveryId)
+}
+
+export type GroupDeliveryHistoryLine = {
+  productName: string
+  quantity: number
+}
+
+export type GroupDeliveryHistoryBundle = {
+  name: string
+  quantity: number
+}
+
+export type GroupDeliveryHistoryAssistance = {
+  kind: DeliveryAssistance['kind']
+  description: string
+  quantity?: number | null
+  amountPesos?: number | null
+}
+
+export type GroupDeliveryHistoryItem = {
+  id: string
+  deliveryDate: string
+  confirmedAt: string
+  lines: GroupDeliveryHistoryLine[]
+  bundles: GroupDeliveryHistoryBundle[]
+  assistances: GroupDeliveryHistoryAssistance[]
+}
+
+export async function listGroupDeliveryHistory(
+  req: DeliveryRequest,
+  groupId: string,
+): Promise<{ docs: GroupDeliveryHistoryItem[] }> {
+  assertDeliveryOperator(req)
+  const id = groupId.trim()
+  if (!id) throw new DeliveryError('VALIDATION_ERROR', 'El grupo es obligatorio.', 422)
+
+  try {
+    await req.payload.findByID({
+      collection: 'family-groups',
+      depth: 0,
+      id,
+      overrideAccess: true,
+      req,
+    })
+  } catch {
+    throw new DeliveryError('NOT_FOUND', 'Grupo no encontrado.', 404)
+  }
+
+  const deliveriesResult = await req.payload.find({
+    collection: 'deliveries',
+    depth: 0,
+    limit: 100,
+    overrideAccess: true,
+    req,
+    sort: '-deliveryDate',
+    where: { group: { equals: id } },
+  })
+  const deliveries = deliveriesResult.docs as Delivery[]
+  if (deliveries.length === 0) return { docs: [] }
+
+  const deliveryIds = deliveries.map((delivery) => delivery.id)
+  const [linesResult, bundlesResult, assistancesResult] = await Promise.all([
+    req.payload.find({
+      collection: 'delivery-lines',
+      depth: 0,
+      limit: 1000,
+      overrideAccess: true,
+      req,
+      where: { delivery: { in: deliveryIds } },
+    }),
+    req.payload.find({
+      collection: 'delivery-bundles',
+      depth: 0,
+      limit: 500,
+      overrideAccess: true,
+      req,
+      where: { delivery: { in: deliveryIds } },
+    }),
+    req.payload.find({
+      collection: 'delivery-assistances',
+      depth: 0,
+      limit: 500,
+      overrideAccess: true,
+      req,
+      sort: 'createdAt',
+      where: { delivery: { in: deliveryIds } },
+    }),
+  ])
+
+  const lines = linesResult.docs as DeliveryLine[]
+  const bundles = bundlesResult.docs as DeliveryBundle[]
+  const assistances = assistancesResult.docs as DeliveryAssistance[]
+  const [productNames, bundleNames] = await Promise.all([
+    loadProductNames(req, lines.map((line) => relationId(line.product))),
+    loadBundleNames(req, bundles.map((bundle) => relationId(bundle.bundleVersion))),
+  ])
+
+  const docs = deliveries
+    .map((delivery) => ({
+      id: delivery.id,
+      deliveryDate: delivery.deliveryDate,
+      confirmedAt: delivery.confirmedAt,
+      lines: lines
+        .filter((line) => relationId(line.delivery) === delivery.id)
+        .map((line) => ({
+          productName: productNames.get(relationId(line.product)) ?? 'Producto',
+          quantity: line.quantity,
+        })),
+      bundles: bundles
+        .filter((bundle) => relationId(bundle.delivery) === delivery.id)
+        .map((bundle) => ({
+          name: bundleNames.get(relationId(bundle.bundleVersion)) ?? 'Bolsón',
+          quantity: bundle.quantity,
+        })),
+      assistances: assistances
+        .filter((assistance) => relationId(assistance.delivery) === delivery.id)
+        .map((assistance) => ({
+          kind: assistance.kind,
+          description: assistance.description,
+          quantity: assistance.quantity,
+          amountPesos: assistance.amountPesos,
+        })),
+    }))
+    .sort((left, right) => {
+      const byDate = right.deliveryDate.localeCompare(left.deliveryDate)
+      if (byDate !== 0) return byDate
+      return right.confirmedAt.localeCompare(left.confirmedAt)
+    })
+
+  return { docs }
+}
+
+async function loadProductNames(req: DeliveryRequest, productIds: string[]): Promise<Map<string, string>> {
+  const ids = [...new Set(productIds)]
+  if (ids.length === 0) return new Map()
+  const result = await req.payload.find({
+    collection: 'products',
+    depth: 0,
+    limit: ids.length,
+    overrideAccess: true,
+    req,
+    where: { id: { in: ids } },
+  })
+  return new Map((result.docs as Product[]).map((product) => [product.id, product.name]))
+}
+
+async function loadBundleNames(req: DeliveryRequest, versionIds: string[]): Promise<Map<string, string>> {
+  const ids = [...new Set(versionIds)]
+  if (ids.length === 0) return new Map()
+  const versionsResult = await req.payload.find({
+    collection: 'bundle-versions',
+    depth: 0,
+    limit: ids.length,
+    overrideAccess: true,
+    req,
+    where: { id: { in: ids } },
+  })
+  const versions = versionsResult.docs as BundleVersion[]
+  const bundleIds = [...new Set(versions.map((version) => relationId(version.bundle)))]
+  const bundlesResult = bundleIds.length
+    ? await req.payload.find({
+        collection: 'bundles',
+        depth: 0,
+        limit: bundleIds.length,
+        overrideAccess: true,
+        req,
+        where: { id: { in: bundleIds } },
+      })
+    : { docs: [] as Bundle[] }
+  const names = new Map((bundlesResult.docs as Bundle[]).map((bundle) => [bundle.id, bundle.name]))
+  return new Map(versions.map((version) => [version.id, names.get(relationId(version.bundle)) ?? `Versión ${version.version}`]))
 }
