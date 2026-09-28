@@ -57,6 +57,6 @@ describe('own password change', () => {
       data: { password: 'nueva-clave', username },
     })
 
-    expect(session.user.username).toBe(username)
+    expect(session.user).toMatchObject({ username })
   })
 })
