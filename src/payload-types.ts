@@ -389,7 +389,10 @@ export interface Delivery {
   recipeDiffReason?: string | null;
   operationKey: string;
   report?: (string | null) | DeliveryReport;
-  status: 'confirmed';
+  status: 'confirmed' | 'annulled';
+  annulledAt?: string | null;
+  annulledBy?: (string | null) | User;
+  annulReason?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -857,6 +860,9 @@ export interface DeliveriesSelect<T extends boolean = true> {
   operationKey?: T;
   report?: T;
   status?: T;
+  annulledAt?: T;
+  annulledBy?: T;
+  annulReason?: T;
   updatedAt?: T;
   createdAt?: T;
 }

@@ -10,6 +10,7 @@ import {
   listDeliveryCatalog,
   listGroupDeliveryHistory,
   returnOrthopedicAssistance,
+  annulDelivery,
   type DeliveryRequest,
 } from '@/deliveries/delivery-service'
 import type { User } from '@/payload-types'
@@ -108,6 +109,17 @@ async function returnAssistanceEndpoint(req: EntregaRequest): Promise<Response> 
   }
 }
 
+async function annulDeliveryEndpoint(req: EntregaRequest): Promise<Response> {
+  try {
+    authorize(req)
+    const id = req.routeParams?.id ?? ''
+    const delivery = await annulDelivery(req, id, await requestBody(req))
+    return Response.json({ doc: delivery })
+  } catch (error) {
+    return deliveryErrorResponse(error)
+  }
+}
+
 export const deliveryEndpoints: Endpoint[] = [
   { handler: (req) => listDeliveriesEndpoint(req as EntregaRequest), method: 'get', path: '/entregas' },
   { handler: (req) => groupHistoryEndpoint(req as EntregaRequest), method: 'get', path: '/entregas/historial' },
@@ -118,6 +130,11 @@ export const deliveryEndpoints: Endpoint[] = [
     handler: (req) => returnAssistanceEndpoint(req as EntregaRequest),
     method: 'post',
     path: '/entregas/:id/asistencias/:assistanceId/devolver',
+  },
+  {
+    handler: (req) => annulDeliveryEndpoint(req as EntregaRequest),
+    method: 'post',
+    path: '/entregas/:id/anular',
   },
   { handler: (req) => getDeliveryEndpoint(req as EntregaRequest), method: 'get', path: '/entregas/:id' },
 ]

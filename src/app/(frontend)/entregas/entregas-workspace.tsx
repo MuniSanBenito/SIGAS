@@ -9,6 +9,7 @@ import {
 } from '@tabler/icons-react'
 import { useEffect, useMemo, useState } from 'react'
 
+import { AppDialog, AppDialogBody, AppDialogFooter } from '../app-dialog'
 import {
   buildContribuyenteSearchParams,
   formatContribuyenteNombre,
@@ -55,6 +56,9 @@ type DeliveryListItem = {
     receiverContributorId: string
     receiverIsThirdParty: boolean
     observations?: string | null
+    status?: 'confirmed' | 'annulled'
+    annulReason?: string | null
+    annulledAt?: string | null
     group: string | { id: string; referenteContributorId: string }
   }
   bundleCount: number
@@ -120,7 +124,7 @@ function todayKey(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-export function EntregasWorkspace() {
+export function EntregasWorkspace({ canAnnul = false }: { canAnnul?: boolean }) {
   const [view, setView] = useState<View>('list')
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
@@ -134,7 +138,7 @@ export function EntregasWorkspace() {
   }
 
   if (view === 'detail' && selectedId) {
-    return <DeliveryDetailPanel deliveryId={selectedId} onBack={() => setView('list')} />
+    return <DeliveryDetailPanel canAnnul={canAnnul} deliveryId={selectedId} onBack={() => setView('list')} />
   }
 
   return (
@@ -245,7 +249,12 @@ function DeliveriesListPanel({ onCreate, onOpen }: { onCreate: () => void; onOpe
                 ) : (
                   docs.map((item) => (
                     <tr key={item.delivery.id}>
-                      <td className="font-semibold">{item.delivery.deliveryDate}</td>
+                      <td className="font-semibold">
+                        <span className="flex flex-wrap items-center gap-2">
+                          {item.delivery.deliveryDate}
+                          {item.delivery.status === 'annulled' && <span className="badge badge-ghost">Anulada</span>}
+                        </span>
+                      </td>
                       <td className="max-w-56 truncate">
                         {typeof item.delivery.group === 'object'
                           ? item.delivery.group.referenteContributorId
@@ -287,12 +296,15 @@ function DeliveriesListPanel({ onCreate, onOpen }: { onCreate: () => void; onOpe
   )
 }
 
-function DeliveryDetailPanel({ deliveryId, onBack }: { deliveryId: string; onBack: () => void }) {
+function DeliveryDetailPanel({ canAnnul, deliveryId, onBack }: { canAnnul: boolean; deliveryId: string; onBack: () => void }) {
   const [detail, setDetail] = useState<DeliveryListItem | null>(null)
   const [group, setGroup] = useState<GroupView | null>(null)
   const [receiver, setReceiver] = useState<Contribuyente | null>(null)
   const [loading, setLoading] = useState(true)
   const [returningId, setReturningId] = useState('')
+  const [annulling, setAnnulling] = useState(false)
+  const [annulOpen, setAnnulOpen] = useState(false)
+  const [annulReason, setAnnulReason] = useState('')
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -348,6 +360,29 @@ function DeliveryDetailPanel({ deliveryId, onBack }: { deliveryId: string; onBac
     }
   }
 
+  async function annul() {
+    if (!annulReason.trim()) return
+    setAnnulling(true)
+    setError('')
+    try {
+      const response = await fetch(`/api/entregas/${deliveryId}/anular`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: annulReason.trim() }),
+      })
+      const payload = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(errorMessage(payload, 'No se pudo anular la entrega.'))
+      setDetail(payload.doc)
+      setAnnulOpen(false)
+      setAnnulReason('')
+    } catch (value) {
+      setError(value instanceof Error ? value.message : 'No se pudo anular la entrega.')
+    } finally {
+      setAnnulling(false)
+    }
+  }
+
   if (loading) {
     return (
       <main className="mx-auto flex min-h-96 w-full max-w-7xl items-center justify-center px-4">
@@ -371,14 +406,26 @@ function DeliveryDetailPanel({ deliveryId, onBack }: { deliveryId: string; onBac
         Volver al listado
       </button>
 
-      <div className="border-b border-line pb-7">
-        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Entrega confirmada</p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight text-content">
-          Entrega del {detail.delivery.deliveryDate}
-        </h1>
-        <p className="mt-2 text-sm text-content-muted">
-          {detail.lineCount} líneas · {detail.totalUnits} unidades · {detail.bundleCount} bolsones · {detail.assistanceCount} asistencias
-        </p>
+      <div className="flex flex-col gap-4 border-b border-line pb-7 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">
+            {detail.delivery.status === 'annulled' ? 'Entrega anulada' : 'Entrega confirmada'}
+          </p>
+          <h1 className="mt-2 text-3xl font-bold tracking-tight text-content">
+            Entrega del {detail.delivery.deliveryDate}
+          </h1>
+          <p className="mt-2 text-sm text-content-muted">
+            {detail.lineCount} líneas · {detail.totalUnits} unidades · {detail.bundleCount} bolsones · {detail.assistanceCount} asistencias
+          </p>
+          {detail.delivery.status === 'annulled' && detail.delivery.annulReason && (
+            <p className="mt-2 text-sm text-content-muted">Motivo de anulación: {detail.delivery.annulReason}</p>
+          )}
+        </div>
+        {canAnnul && detail.delivery.status !== 'annulled' && (
+          <button className="btn btn-error btn-outline" onClick={() => setAnnulOpen(true)} type="button">
+            Anular entrega
+          </button>
+        )}
       </div>
 
       {error && <div className="alert alert-error mt-4" role="alert"><span>{error}</span></div>}
@@ -434,7 +481,7 @@ function DeliveryDetailPanel({ deliveryId, onBack }: { deliveryId: string; onBac
                     <p className="text-sm text-content-muted">Monto: ${assistance.amountPesos.toLocaleString('es-AR')}</p>
                   )}
                 </div>
-                {assistance.kind === 'orthopedic' && assistance.loanStatus !== 'returned' && (
+                {detail.delivery.status !== 'annulled' && assistance.kind === 'orthopedic' && assistance.loanStatus !== 'returned' && (
                   <button
                     className="btn btn-outline btn-sm"
                     disabled={returningId === assistance.id}
@@ -453,6 +500,32 @@ function DeliveryDetailPanel({ deliveryId, onBack }: { deliveryId: string; onBac
             ))}
           </ul>
         </section>
+      )}
+
+      {annulOpen && (
+        <AppDialog
+          description="La entrega queda visible como anulada. El stock de los productos vuelve al depósito. Después podés cargar la entrega correcta."
+          onClose={() => { if (!annulling) setAnnulOpen(false) }}
+          size="md"
+          title="Anular entrega"
+        >
+          <AppDialogBody>
+            <label className="space-y-2">
+              <span className="text-sm font-semibold text-content">Motivo obligatorio</span>
+              <textarea
+                className="textarea textarea-bordered min-h-28 w-full bg-surface text-content"
+                onChange={(event) => setAnnulReason(event.target.value)}
+                value={annulReason}
+              />
+            </label>
+          </AppDialogBody>
+          <AppDialogFooter>
+            <button className="btn btn-ghost min-h-11" disabled={annulling} onClick={() => setAnnulOpen(false)} type="button">Cancelar</button>
+            <button className="btn btn-error min-h-11" disabled={annulling || !annulReason.trim()} onClick={() => void annul()} type="button">
+              {annulling ? 'Anulando…' : 'Anular'}
+            </button>
+          </AppDialogFooter>
+        </AppDialog>
       )}
     </main>
   )

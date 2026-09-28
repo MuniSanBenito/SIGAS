@@ -2,7 +2,7 @@ import { headers as getHeaders } from 'next/headers.js'
 import { redirect } from 'next/navigation'
 import { getPayload } from 'payload'
 
-import { canAccessModule } from '@/access/roles'
+import { canAccessModule, hasRole } from '@/access/roles'
 import config from '@/payload.config'
 
 import { DashboardShell } from '../dashboard-shell'
@@ -19,7 +19,7 @@ export default async function EntregasPage() {
 
   return (
     <DashboardShell roles={user.roles}>
-      <EntregasWorkspace />
+      <EntregasWorkspace canAnnul={hasRole(user, 'admin')} />
     </DashboardShell>
   )
 }

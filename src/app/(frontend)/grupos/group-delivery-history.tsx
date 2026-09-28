@@ -13,6 +13,7 @@ type HistoryAssistance = {
 type HistoryItem = {
   id: string
   deliveryDate: string
+  status?: 'confirmed' | 'annulled'
   lines: HistoryLine[]
   bundles: HistoryBundle[]
   assistances: HistoryAssistance[]
@@ -113,7 +114,12 @@ export function GroupDeliveryHistory({ groupId }: { groupId: string }) {
               ) : (
                 docs.map((item) => (
                   <tr key={item.id}>
-                    <td className="whitespace-nowrap font-semibold">{formatDeliveryDate(item.deliveryDate)}</td>
+                    <td className="whitespace-nowrap font-semibold">
+                      <span className="flex flex-wrap items-center gap-2">
+                        {formatDeliveryDate(item.deliveryDate)}
+                        {item.status === 'annulled' && <span className="badge badge-ghost">Anulada</span>}
+                      </span>
+                    </td>
                     <td>
                       <ul className="space-y-1">
                         {describeItem(item).map((line) => (

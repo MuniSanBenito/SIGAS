@@ -3,10 +3,18 @@ import { describe, expect, it } from 'vitest'
 import {
   assertRecipeDiffReason,
   expandProposalLines,
+  parseAnnulDeliveryInput,
   parseConfirmDeliveryInput,
   parseProposalInput,
   recipeTotalsDiffer,
 } from './validation'
+
+describe('delivery annulment validation', () => {
+  it('requires a reason', () => {
+    expect(() => parseAnnulDeliveryInput({})).toThrow('motivo de anulación es obligatorio')
+    expect(parseAnnulDeliveryInput({ reason: '  Se cargó mal  ' }).reason).toBe('Se cargó mal')
+  })
+})
 
 describe('delivery validation', () => {
   const base = {

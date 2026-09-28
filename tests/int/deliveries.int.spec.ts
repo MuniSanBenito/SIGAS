@@ -11,6 +11,7 @@ import { getPayload, type Payload } from 'payload'
 import config from '@/payload.config'
 import { recordStockMovement, type InventoryRequest } from '@/inventory/stock-service'
 import {
+  annulDelivery,
   buildProposal,
   confirmDelivery,
   listDeliveryCatalog,
@@ -721,6 +722,130 @@ describe('deliveries service', () => {
     await expect(listGroupDeliveryHistory({ payload, user: stockActor } as unknown as DeliveryRequest, groupId)).rejects.toMatchObject({
       code: 'FORBIDDEN',
       status: 403,
+    })
+  })
+
+  it('annuls a confirmed delivery, restores stock once, and keeps the original visible', async () => {
+    const req = { payload, user: actor } as unknown as DeliveryRequest
+    const before = await payload.find({
+      collection: 'stock-balances',
+      limit: 1,
+      overrideAccess: true,
+      where: { balanceKey: { equals: `${product.id}:general` } },
+    })
+    const quantityBefore = before.docs[0]?.quantity ?? 0
+
+    const confirmed = await confirmDelivery(req, {
+      groupId,
+      receiverContributorId: 'contrib-1',
+      receiverIsThirdParty: false,
+      deliveryDate: '2026-09-22',
+      operationKey: `${runKey}-annul`,
+      bundles: [{ bundleVersionId: bundleVersion.id, quantity: 1 }],
+      lines: [{ productId: product.id, quantity: 2, bundleVersionId: bundleVersion.id }],
+      assistances: [{ kind: 'atmospheric', description: 'Temporal mal cargado' }],
+    })
+    createdDeliveryIds.push(confirmed.delivery.id)
+
+    const afterConfirm = await payload.find({
+      collection: 'stock-balances',
+      limit: 1,
+      overrideAccess: true,
+      where: { balanceKey: { equals: `${product.id}:general` } },
+    })
+    expect(afterConfirm.docs[0]?.quantity).toBe(quantityBefore - 2)
+
+    const annulled = await annulDelivery(req, confirmed.delivery.id, {
+      reason: 'Se cargó el bolsón equivocado',
+    })
+    expect(annulled.delivery.id).toBe(confirmed.delivery.id)
+    expect(annulled.delivery.status).toBe('annulled')
+    expect(annulled.delivery.annulReason).toBe('Se cargó el bolsón equivocado')
+
+    const afterAnnul = await payload.find({
+      collection: 'stock-balances',
+      limit: 1,
+      overrideAccess: true,
+      where: { balanceKey: { equals: `${product.id}:general` } },
+    })
+    expect(afterAnnul.docs[0]?.quantity).toBe(quantityBefore)
+
+    const exits = await payload.find({
+      collection: 'stock-movements',
+      limit: 10,
+      overrideAccess: true,
+      where: {
+        and: [
+          { referenceId: { equals: confirmed.delivery.id } },
+          { reason: { equals: 'delivery' } },
+        ],
+      },
+    })
+    expect(exits.totalDocs).toBeGreaterThan(0)
+    expect(exits.docs.every((movement) => movement.status === 'corrected')).toBe(true)
+
+    const replay = await annulDelivery(req, confirmed.delivery.id, { reason: 'Reintento' })
+    expect(replay.delivery.annulReason).toBe('Se cargó el bolsón equivocado')
+    const afterReplay = await payload.find({
+      collection: 'stock-balances',
+      limit: 1,
+      overrideAccess: true,
+      where: { balanceKey: { equals: `${product.id}:general` } },
+    })
+    expect(afterReplay.docs[0]?.quantity).toBe(quantityBefore)
+
+    await expect(
+      annulDelivery({ payload, user: administrationActor } as unknown as DeliveryRequest, confirmed.delivery.id, {
+        reason: 'No corresponde',
+      }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN', status: 403 })
+
+    const history = await listGroupDeliveryHistory(req, groupId)
+    expect(history.docs.find((item) => item.id === confirmed.delivery.id)?.status).toBe('annulled')
+  })
+
+  it('annuls a subsidy delivery without moving stock', async () => {
+    const req = { payload, user: actor } as unknown as DeliveryRequest
+    const before = await payload.find({
+      collection: 'stock-balances',
+      limit: 1,
+      overrideAccess: true,
+      where: { balanceKey: { equals: `${product.id}:general` } },
+    })
+    const confirmed = await confirmDelivery(req, {
+      groupId,
+      receiverContributorId: 'contrib-1',
+      receiverIsThirdParty: false,
+      deliveryDate: '2026-09-23',
+      operationKey: `${runKey}-annul-subsidy`,
+      bundles: [],
+      lines: [],
+      assistances: [{ kind: 'money', description: 'Ayuda mal cargada', amountPesos: 5000 }],
+    })
+    createdDeliveryIds.push(confirmed.delivery.id)
+
+    const annulled = await annulDelivery(req, confirmed.delivery.id, { reason: 'El monto no correspondía' })
+    expect(annulled.delivery.status).toBe('annulled')
+    expect(annulled.lineCount).toBe(0)
+
+    const after = await payload.find({
+      collection: 'stock-balances',
+      limit: 1,
+      overrideAccess: true,
+      where: { balanceKey: { equals: `${product.id}:general` } },
+    })
+    expect(after.docs[0]?.quantity).toBe(before.docs[0]?.quantity)
+  })
+
+  it('requires a reason and an existing delivery to annul', async () => {
+    const req = { payload, user: actor } as unknown as DeliveryRequest
+    await expect(annulDelivery(req, 'missing-delivery', {})).rejects.toMatchObject({
+      code: 'VALIDATION_ERROR',
+      status: 422,
+    })
+    await expect(annulDelivery(req, 'missing-delivery', { reason: 'Error de carga' })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      status: 404,
     })
   })
 })

@@ -2,8 +2,9 @@ import type { PayloadRequest } from 'payload'
 
 import { getContribuyenteById } from '@/integrations/padron/san-benito-client'
 import type { Contribuyente } from '@/lib/contribuyente-map'
-import { canAccessModule, getRoles } from '../access/roles'
-import { recordStockMovement, type InventoryRequest } from '../inventory/stock-service'
+import { canAccessModule, getRoles, hasRole } from '../access/roles'
+import { InventoryError } from '../inventory/errors'
+import { compensateDeliveryMovements, recordStockMovement, type InventoryRequest } from '../inventory/stock-service'
 import type {
   Bundle,
   BundleVersion,
@@ -24,6 +25,7 @@ import type { ConfirmDeliveryInput, ProposalInput, ProposedLine } from './types'
 import {
   assertRecipeDiffReason,
   expandProposalLines,
+  parseAnnulDeliveryInput,
   parseConfirmDeliveryInput,
   parseProposalInput,
   totalsByProduct,
@@ -863,13 +865,112 @@ async function assertUnlinkedReport(req: DeliveryRequest, reportId: string): Pro
   }
 }
 
+export async function annulDelivery(
+  req: DeliveryRequest,
+  deliveryId: string,
+  input: unknown,
+): Promise<HydratedDelivery> {
+  const actor = assertDeliveryOperator(req)
+  if (!hasRole(actor, 'admin')) {
+    throw new DeliveryError('FORBIDDEN', 'Solo un administrador puede anular una entrega.', 403)
+  }
+  const { reason } = parseAnnulDeliveryInput(input)
+  const id = deliveryId.trim()
+  if (!id) throw new DeliveryError('NOT_FOUND', 'Entrega no encontrada.', 404)
+
+  let current: Delivery
+  try {
+    current = (await req.payload.findByID({
+      collection: 'deliveries',
+      depth: 0,
+      id,
+      overrideAccess: true,
+      req,
+    })) as Delivery
+  } catch {
+    throw new DeliveryError('NOT_FOUND', 'Entrega no encontrada.', 404)
+  }
+  if (!current) throw new DeliveryError('NOT_FOUND', 'Entrega no encontrada.', 404)
+
+  if (current.status === 'annulled') {
+    await auditDeliveryAction(req, actor, {
+      action: 'deliveries.annulled',
+      result: 'replayed',
+      targetId: current.id,
+      targetType: 'delivery',
+    })
+    return getDeliveryById(req, current.id)
+  }
+
+  const transactionID = await req.payload.db.beginTransaction()
+  if (transactionID === null) {
+    throw new DeliveryError('INTERNAL_ERROR', 'No se pudo iniciar la transacción de anulación.', 500)
+  }
+  const txReq = { ...req, transactionID } as DeliveryRequest
+  const inventoryReq = { ...req, transactionID, user: actor } as unknown as InventoryRequest
+
+  try {
+    const fresh = (await txReq.payload.findByID({
+      collection: 'deliveries',
+      depth: 0,
+      id,
+      overrideAccess: true,
+      req: txReq,
+    })) as Delivery
+    if (fresh.status === 'annulled') {
+      await txReq.payload.db.commitTransaction(transactionID)
+      return getDeliveryById(req, fresh.id)
+    }
+
+    const compensated = await compensateDeliveryMovements(inventoryReq, fresh.id, reason)
+    const annulledAt = new Date().toISOString()
+    await txReq.payload.update({
+      collection: 'deliveries',
+      data: {
+        annulReason: reason,
+        annulledAt,
+        annulledBy: actor.id,
+        status: 'annulled',
+      },
+      id: fresh.id,
+      overrideAccess: true,
+      req: txReq,
+    })
+    await auditDeliveryAction(txReq, actor, {
+      action: 'deliveries.annulled',
+      after: { annulledAt, status: 'annulled' },
+      before: { status: 'confirmed' },
+      context: { compensatedMovements: compensated },
+      reason,
+      result: 'success',
+      targetId: fresh.id,
+      targetType: 'delivery',
+    })
+    await txReq.payload.db.commitTransaction(transactionID)
+    return getDeliveryById(req, fresh.id)
+  } catch (error) {
+    await req.payload.db.rollbackTransaction(transactionID)
+    if (error instanceof InventoryError) {
+      throw new DeliveryError(
+        error.status === 409 ? 'CONFLICT' : 'VALIDATION_ERROR',
+        'No se pudo compensar el stock de la entrega.',
+        error.status,
+      )
+    }
+    throw error
+  }
+}
+
 export async function returnOrthopedicAssistance(
   req: DeliveryRequest,
   deliveryId: string,
   assistanceId: string,
 ): Promise<HydratedDelivery> {
   const actor = assertDeliveryOperator(req)
-  await getDeliveryById(req, deliveryId)
+  const delivery = await getDeliveryById(req, deliveryId)
+  if (delivery.delivery.status === 'annulled') {
+    throw new DeliveryError('CONFLICT', 'No se puede registrar una devolución de una entrega anulada.', 409)
+  }
 
   let assistance: DeliveryAssistance
   try {
@@ -933,6 +1034,7 @@ export type GroupDeliveryHistoryItem = {
   id: string
   deliveryDate: string
   confirmedAt: string
+  status: Delivery['status']
   lines: GroupDeliveryHistoryLine[]
   bundles: GroupDeliveryHistoryBundle[]
   assistances: GroupDeliveryHistoryAssistance[]
@@ -1012,6 +1114,7 @@ export async function listGroupDeliveryHistory(
       id: delivery.id,
       deliveryDate: delivery.deliveryDate,
       confirmedAt: delivery.confirmedAt,
+      status: delivery.status,
       lines: lines
         .filter((line) => relationId(line.delivery) === delivery.id)
         .map((line) => ({

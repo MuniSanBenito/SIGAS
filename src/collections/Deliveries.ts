@@ -82,8 +82,24 @@ export const Deliveries: CollectionConfig = {
       name: 'status',
       type: 'select',
       defaultValue: 'confirmed',
-      options: ['confirmed'],
+      options: [
+        { label: 'Confirmada', value: 'confirmed' },
+        { label: 'Anulada', value: 'annulled' },
+      ],
       required: true,
+    },
+    {
+      name: 'annulledAt',
+      type: 'date',
+    },
+    {
+      name: 'annulledBy',
+      type: 'relationship',
+      relationTo: 'users',
+    },
+    {
+      name: 'annulReason',
+      type: 'textarea',
     },
   ],
   indexes: [{ fields: ['group', 'deliveryDate'] }],

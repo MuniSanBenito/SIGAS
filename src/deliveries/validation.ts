@@ -299,6 +299,20 @@ export function recipeTotalsDiffer(
   return false
 }
 
+export function parseAnnulDeliveryInput(input: unknown): { reason: string } {
+  if (!isRecord(input)) {
+    throw new DeliveryError('VALIDATION_ERROR', 'El cuerpo de la solicitud debe ser un objeto.', 422)
+  }
+  const reason = input.reason
+  if (typeof reason !== 'string' || !reason.trim()) {
+    throw new DeliveryError('VALIDATION_ERROR', 'El motivo de anulación es obligatorio.', 422)
+  }
+  if (reason.trim().length > 500) {
+    throw new DeliveryError('VALIDATION_ERROR', 'El motivo de anulación es demasiado largo.', 422)
+  }
+  return { reason: reason.trim() }
+}
+
 export function assertRecipeDiffReason(
   expected: Map<string, number>,
   actualLines: { productId: string; quantity: number }[],

@@ -507,3 +507,78 @@ export async function correctStockMovement(
     replayed: false,
   }
 }
+
+export async function compensateDeliveryMovements(
+  req: InventoryRequest,
+  deliveryId: string,
+  reason: string,
+): Promise<number> {
+  const movements = await req.payload.find({
+    collection: 'stock-movements',
+    depth: 0,
+    limit: 1000,
+    overrideAccess: true,
+    req,
+    sort: 'createdAt',
+    where: {
+      and: [
+        { referenceType: { equals: 'delivery' } },
+        { referenceId: { equals: deliveryId } },
+        { status: { equals: 'active' } },
+      ],
+    },
+  })
+
+  const today = new Date().toISOString().slice(0, 10)
+  for (const movement of movements.docs as StockMovement[]) {
+    const operationKey = `annul-${deliveryId}-${movement.id}`
+    const replayed = await findReplayedMovement(req, operationKey)
+    if (replayed) continue
+
+    const productId = relationId(movement.product)
+    const lotId = movement.lot ? relationId(movement.lot) : undefined
+    const current = await findBalance(req, balanceKey(productId, lotId))
+    const currentQuantity = current?.quantity ?? 0
+    const delta = -originalMovementDelta(movement)
+    const result = calculateStockResult(currentQuantity, delta)
+
+    await req.payload.create({
+      collection: 'stock-movements',
+      data: {
+        adjustmentDirection: delta >= 0 ? 'increase' : 'decrease',
+        adjustmentMode: 'manual',
+        correctionOf: movement.id,
+        createdBy: req.user.id,
+        lot: lotId,
+        movementType: 'adjustment',
+        observation: `Anulación de entrega ${deliveryId}`,
+        operationalDate: today,
+        operationKey,
+        previousQuantity: result.previousQuantity,
+        product: productId,
+        quantity: Math.abs(delta),
+        reason,
+        resultingQuantity: result.resultingQuantity,
+        source: 'correction',
+        status: 'active',
+      },
+      depth: 0,
+      draft: false,
+      overrideAccess: true,
+      req,
+    })
+
+    await req.payload.update({
+      collection: 'stock-movements',
+      data: { status: 'corrected' },
+      depth: 0,
+      id: movement.id,
+      overrideAccess: true,
+      req,
+    })
+
+    await saveBalance(req, productId, lotId, result.resultingQuantity, current)
+  }
+
+  return movements.totalDocs
+}
