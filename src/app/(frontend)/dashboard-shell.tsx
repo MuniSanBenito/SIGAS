@@ -4,11 +4,12 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 
-import { IconHeartHandshake, IconHome, IconLogout, IconMenu2, IconPackages, IconUsers, IconX } from '@tabler/icons-react'
+import { IconHeartHandshake, IconHome, IconKey, IconLogout, IconMenu2, IconPackages, IconUsers, IconX } from '@tabler/icons-react'
 
 import { canAccessModule, type ModuleKey, type Role } from '@/access/roles'
 
 import { Brand } from './brand'
+import { ChangePasswordDialog } from './change-password-dialog'
 import { ThemeToggle } from './theme-toggle'
 
 type DashboardShellProps = {
@@ -33,6 +34,8 @@ const navigationItems: NavigationItem[] = [
 export function DashboardShell({ children, roles }: DashboardShellProps) {
   const router = useRouter()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isPasswordOpen, setIsPasswordOpen] = useState(false)
+  const [passwordNotice, setPasswordNotice] = useState<string | null>(null)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [logoutError, setLogoutError] = useState<string | null>(null)
   const menuButtonRef = useRef<HTMLButtonElement>(null)
@@ -92,6 +95,13 @@ export function DashboardShell({ children, roles }: DashboardShellProps) {
     menuButtonRef.current?.focus()
   }
 
+  function openPasswordDialog() {
+    setLogoutError(null)
+    setPasswordNotice(null)
+    setIsMenuOpen(false)
+    setIsPasswordOpen(true)
+  }
+
   return (
     <div className="min-h-screen overflow-x-hidden bg-page text-content lg:grid lg:grid-cols-[17rem_minmax(0,1fr)]">
       <aside aria-label="Navegación principal" className="hidden min-h-screen flex-col border-r border-[var(--c-sidebar-border)] bg-sidebar text-[var(--c-sidebar-text)] lg:flex">
@@ -99,6 +109,7 @@ export function DashboardShell({ children, roles }: DashboardShellProps) {
         <nav aria-label="Secciones del sistema" className="flex-1 px-4 py-6"><Navigation roles={roles} /></nav>
         <div className="border-t border-[var(--c-sidebar-border)] p-4">
           <div className="mb-2 flex justify-end"><ThemeToggle /></div>
+          <PasswordButton disabled={isLoggingOut} onClick={openPasswordDialog} />
           <LogoutButton isLoggingOut={isLoggingOut} onClick={handleLogout} />
         </div>
       </aside>
@@ -125,13 +136,26 @@ export function DashboardShell({ children, roles }: DashboardShellProps) {
                 </button>
               </div>
               <nav aria-label="Secciones del sistema" className="flex-1 px-4 py-6"><Navigation onClick={closeMenu} roles={roles} /></nav>
-              <div className="border-t border-[var(--c-sidebar-border)] p-4"><LogoutButton isLoggingOut={isLoggingOut} onClick={handleLogout} /></div>
+              <div className="border-t border-[var(--c-sidebar-border)] p-4">
+                <PasswordButton disabled={isLoggingOut} onClick={openPasswordDialog} />
+                <LogoutButton isLoggingOut={isLoggingOut} onClick={handleLogout} />
+              </div>
             </aside>
           </div>
         )}
 
         {logoutError && <p className="mx-auto mt-6 max-w-7xl rounded-box border border-error/30 bg-error/10 px-4 py-3 text-sm text-error sm:mx-6 lg:mx-10" role="alert">{logoutError}</p>}
+        {passwordNotice && <p className="mx-auto mt-6 max-w-7xl rounded-box border border-success/30 bg-success/10 px-4 py-3 text-sm text-success sm:mx-6 lg:mx-10" role="status">{passwordNotice}</p>}
         {children}
+        {isPasswordOpen && (
+          <ChangePasswordDialog
+            onClose={() => setIsPasswordOpen(false)}
+            onSaved={() => {
+              setIsPasswordOpen(false)
+              setPasswordNotice('Contraseña actualizada.')
+            }}
+          />
+        )}
       </div>
     </div>
   )
@@ -156,6 +180,10 @@ function Navigation({ onClick, roles }: { onClick?: () => void; roles?: readonly
         })}
     </div>
   )
+}
+
+function PasswordButton({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
+  return <button className="flex min-h-11 w-full items-center gap-3 rounded-box px-4 py-3 text-left text-sm font-semibold text-[var(--c-sidebar-muted)] transition-colors hover:bg-[var(--c-nav-hover)] hover:text-[var(--c-sidebar-text)] disabled:cursor-wait disabled:opacity-60" disabled={disabled} onClick={onClick} type="button"><IconKey aria-hidden="true" className="h-5 w-5" stroke={1.8} />Cambiar contraseña</button>
 }
 
 function LogoutButton({ isLoggingOut, onClick }: { isLoggingOut: boolean; onClick: () => void }) {

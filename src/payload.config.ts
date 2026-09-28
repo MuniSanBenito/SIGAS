@@ -15,6 +15,7 @@ import { DeliveryLines } from './collections/DeliveryLines'
 import { FamilyGroups } from './collections/FamilyGroups'
 import { GroupMembers } from './collections/GroupMembers'
 import { KinshipRelations } from './collections/KinshipRelations'
+import { accountEndpoints } from './endpoints/cuenta'
 import { contribuyenteEndpoints } from './endpoints/contribuyentes'
 import { deliveryEndpoints } from './endpoints/entregas'
 import { groupEndpoints } from './endpoints/grupos'
@@ -74,7 +75,13 @@ export default buildConfig({
   db: mongooseAdapter({
     url: process.env.DATABASE_URL || '',
   }),
-  endpoints: [...inventoryEndpoints, ...contribuyenteEndpoints, ...groupEndpoints, ...deliveryEndpoints],
+  endpoints: [
+    ...accountEndpoints,
+    ...inventoryEndpoints,
+    ...contribuyenteEndpoints,
+    ...groupEndpoints,
+    ...deliveryEndpoints,
+  ],
   sharp,
   plugins: [],
 })
