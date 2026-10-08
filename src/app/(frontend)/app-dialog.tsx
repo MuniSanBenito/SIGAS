@@ -14,6 +14,7 @@ type AppDialogProps = {
   description?: string
   eyebrow?: string
   onClose: () => void
+  placement?: 'bottom' | 'middle'
   size?: keyof typeof SIZE_CLASS
   title: string
 }
@@ -23,6 +24,7 @@ export function AppDialog({
   description,
   eyebrow,
   onClose,
+  placement = 'bottom',
   size = 'lg',
   title,
 }: AppDialogProps) {
@@ -58,15 +60,20 @@ export function AppDialog({
     }
   }, [])
 
+  const modalPlacementClass =
+    placement === 'middle' ? 'modal modal-middle' : 'modal modal-bottom sm:modal-middle'
+  const modalBoxPlacementClass =
+    placement === 'middle' ? 'mx-4 w-[calc(100%-2rem)] max-w-[calc(100%-2rem)] sm:mx-auto sm:w-full sm:max-w-none' : ''
+
   return (
     <dialog
       aria-describedby={description ? descriptionId : undefined}
       aria-labelledby={titleId}
-      className="modal modal-bottom sm:modal-middle"
+      className={modalPlacementClass}
       ref={dialogRef}
     >
       <div
-        className={`modal-box flex w-full flex-col !overflow-hidden border border-line bg-surface !p-0 shadow-lg !max-h-[min(44rem,calc(100dvh-0.75rem))] sm:!max-h-[min(44rem,calc(100dvh-2rem))] ${SIZE_CLASS[size]}`}
+        className={`modal-box flex flex-col !overflow-hidden border border-line bg-surface !p-0 shadow-lg !max-h-[min(44rem,calc(100dvh-0.75rem))] sm:!max-h-[min(44rem,calc(100dvh-2rem))] ${modalBoxPlacementClass} ${SIZE_CLASS[size]}`}
       >
         <header className="flex shrink-0 items-start justify-between gap-4 border-b border-line px-5 py-4 sm:px-6">
           <div className="min-w-0 pt-0.5">

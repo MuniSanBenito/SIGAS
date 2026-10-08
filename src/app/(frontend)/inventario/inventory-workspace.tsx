@@ -10,7 +10,6 @@ import {
   IconHistory,
   IconPackages,
   IconPlus,
-  IconRefresh,
 } from '@tabler/icons-react'
 
 import {
@@ -35,6 +34,15 @@ import type {
 type Dialog = 'category' | 'load' | 'product' | 'recipe' | null
 type View = 'stock' | 'movements' | 'bolsones' | 'catalog'
 type StockFilter = 'all' | 'expiring' | 'low'
+
+const INVENTORY_PAGE_SIZE = 10
+
+function getInventoryPageSlice<T>(items: T[], page: number) {
+  const totalPages = Math.max(1, Math.ceil(items.length / INVENTORY_PAGE_SIZE))
+  const safePage = Math.min(Math.max(1, page), totalPages)
+  const start = (safePage - 1) * INVENTORY_PAGE_SIZE
+  return { items: items.slice(start, start + INVENTORY_PAGE_SIZE), safePage, totalPages }
+}
 
 async function getJSON<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { credentials: 'same-origin', ...init })
@@ -73,10 +81,9 @@ export function InventoryWorkspace() {
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [listPage, setListPage] = useState(1)
 
   async function loadData() {
-    setIsRefreshing(true)
     try {
       const [nextOverview, recipeResponse] = await Promise.all([
         getJSON<InventoryOverview>('/api/inventory/overview?includeInactive=true&limit=200&movementLimit=50'),
@@ -89,7 +96,6 @@ export function InventoryWorkspace() {
       setError(loadError instanceof Error ? loadError.message : 'No se pudo cargar el inventario.')
     } finally {
       setIsLoading(false)
-      setIsRefreshing(false)
     }
   }
 
@@ -99,6 +105,10 @@ export function InventoryWorkspace() {
     }, 0)
     return () => window.clearTimeout(loadTimer)
   }, [])
+
+  useEffect(() => {
+    setListPage(1)
+  }, [activeView, search, stockFilter])
 
   function closeDialog() {
     setDialog(null)
@@ -176,24 +186,12 @@ export function InventoryWorkspace() {
 
   return (
     <main className="mx-auto w-full max-w-7xl px-4 py-8 pb-24 sm:px-6 sm:py-10 lg:px-10 lg:py-12" id="main-content">
-      <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Depósito</p>
-          <h1 className="mt-2 text-3xl font-bold tracking-tight text-content sm:text-4xl">Inventario</h1>
-          <p className="mt-3 max-w-2xl text-base leading-7 text-content-muted">
-            Mirá qué hay, cargá mercadería y controlá los bolsones con pocas pantallas.
-          </p>
-        </div>
-        <button
-          aria-label="Actualizar inventario"
-          className="btn btn-ghost self-start lg:self-auto"
-          disabled={isRefreshing}
-          onClick={() => void loadData()}
-          type="button"
-        >
-          <IconRefresh aria-hidden="true" className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
-          Actualizar
-        </button>
+      <div>
+        <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">Depósito</p>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight text-content sm:text-4xl">Inventario</h1>
+        <p className="mt-3 max-w-2xl text-base leading-7 text-content-muted">
+          Mirá qué hay, cargá mercadería y controlá los bolsones con pocas pantallas.
+        </p>
       </div>
 
       {message && (
@@ -207,29 +205,13 @@ export function InventoryWorkspace() {
         </p>
       )}
 
-      <section aria-label="Resumen de inventario" className="mt-8 grid gap-4 sm:grid-cols-3">
-        <SummaryCard
-          label="Productos"
-          onClick={() => { setActiveView('stock'); setStockFilter('all') }}
-          value={overview?.data.summary.totalProducts ?? 0}
-        />
-        <SummaryCard
-          label="Falta"
-          onClick={() => { setActiveView('stock'); setStockFilter('low') }}
-          tone="warning"
-          value={overview?.data.summary.lowStockProducts ?? 0}
-        />
-        <SummaryCard
-          label="Por vencer"
-          onClick={() => { setActiveView('stock'); setStockFilter('expiring') }}
-          tone="error"
-          value={overview?.data.summary.expiringLots ?? 0}
-        />
-      </section>
-
       <section className="mt-8 rounded-box border border-line bg-surface p-4 shadow-sm sm:p-6">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div className="tabs tabs-boxed w-fit max-w-full overflow-x-auto bg-surface-alt" role="tablist" aria-label="Vistas de inventario">
+          <div
+            className="tabs tabs-bordered grid w-full grid-cols-4 gap-0 rounded-box border border-line bg-surface-alt p-0.5 sm:flex sm:w-fit sm:max-w-full sm:flex-nowrap sm:overflow-x-auto"
+            role="tablist"
+            aria-label="Vistas de inventario"
+          >
             <TabButton active={activeView === 'stock'} label="Stock" onClick={() => setActiveView('stock')} />
             <TabButton active={activeView === 'movements'} label="Historial" onClick={() => setActiveView('movements')} />
             <TabButton active={activeView === 'bolsones'} label="Bolsones" onClick={() => setActiveView('bolsones')} />
@@ -254,7 +236,9 @@ export function InventoryWorkspace() {
               <StockView
                 expandedProductId={expandedProductId}
                 filteredProducts={filteredProducts}
+                listPage={listPage}
                 onExpand={setExpandedProductId}
+                onListPageChange={setListPage}
                 onLoad={openLoad}
                 onSearch={setSearch}
                 search={search}
@@ -263,10 +247,17 @@ export function InventoryWorkspace() {
               />
             )}
             {activeView === 'movements' && (
-              <MovementView movements={overview?.data.recentMovements ?? []} onCorrect={setCorrectionTarget} />
+              <MovementView
+                listPage={listPage}
+                movements={overview?.data.recentMovements ?? []}
+                onCorrect={setCorrectionTarget}
+                onListPageChange={setListPage}
+              />
             )}
             {activeView === 'bolsones' && (
               <BolsonesView
+                listPage={listPage}
+                onListPageChange={setListPage}
                 onNewRecipe={() => { setEditingRecipe(null); setDialog('recipe') }}
                 onNewVersion={(recipe) => { setEditingRecipe(recipe); setDialog('recipe') }}
                 recipes={recipes}
@@ -275,9 +266,11 @@ export function InventoryWorkspace() {
             {activeView === 'catalog' && (
               <CatalogView
                 categories={categories}
+                listPage={listPage}
                 onDeactivate={setDeactivationTarget}
                 onEditCategory={(category) => { setEditingCategory(category); setDialog('category') }}
                 onEditProduct={(product) => { setEditingProduct(product); setDialog('product') }}
+                onListPageChange={setListPage}
                 onNewCategory={() => { setEditingCategory(null); setDialog('category') }}
                 onNewProduct={() => { setEditingProduct(null); setDialog('product') }}
                 onReactivate={(product) => void reactivateProduct(product)}
@@ -299,6 +292,7 @@ export function InventoryWorkspace() {
         <AppDialog
           description="Agrupá productos para encontrarlos más rápido."
           onClose={closeDialog}
+          placement="middle"
           title={editingCategory ? 'Editar categoría' : 'Nueva categoría'}
         >
           <CategoryForm category={editingCategory} onCancel={closeDialog} onSaved={handleSaved} />
@@ -309,6 +303,7 @@ export function InventoryWorkspace() {
         <AppDialog
           description="Definí cómo se va a controlar dentro del depósito."
           onClose={closeDialog}
+          placement="middle"
           title={editingProduct ? 'Editar producto' : 'Nuevo producto'}
         >
           <ProductForm categories={categories} onCancel={closeDialog} onSaved={handleSaved} product={editingProduct} />
@@ -319,6 +314,7 @@ export function InventoryWorkspace() {
         <AppDialog
           description="Elegí qué querés hacer y agregá los productos de una vez."
           onClose={closeDialog}
+          placement="middle"
           size="xl"
           title="Cargar"
         >
@@ -336,6 +332,7 @@ export function InventoryWorkspace() {
         <AppDialog
           description="Cada cambio guarda una versión nueva. La anterior queda registrada."
           onClose={closeDialog}
+          placement="middle"
           title={editingRecipe?.currentVersion ? `Cambiar composición · ${editingRecipe.bundleName}` : 'Nuevo bolsón'}
         >
           <RecipeForm onCancel={closeDialog} onSaved={handleSaved} products={products} recipe={editingRecipe} />
@@ -346,6 +343,7 @@ export function InventoryWorkspace() {
         <AppDialog
           description={`${deactivationTarget.name} conservará su stock e historial, pero no podrá recibir entradas ni formar parte de bolsones.`}
           onClose={() => setDeactivationTarget(null)}
+          placement="middle"
           size="md"
           title="Dejar de usar producto"
         >
@@ -372,6 +370,7 @@ export function InventoryWorkspace() {
         <AppDialog
           description="Se registrará un ajuste compensatorio. El movimiento original quedará anulado."
           onClose={() => setCorrectionTarget(null)}
+          placement="middle"
           size="md"
           title="Deshacer movimiento"
         >
@@ -397,47 +396,57 @@ export function InventoryWorkspace() {
   )
 }
 
-function SummaryCard({
-  label,
-  onClick,
-  tone = 'primary',
-  value,
-}: {
-  label: string
-  onClick?: () => void
-  tone?: 'error' | 'primary' | 'warning'
-  value: number
-}) {
-  const toneClass = tone === 'error' ? 'text-error' : tone === 'warning' ? 'text-warning' : 'text-primary'
-  const content = (
-    <>
-      <div className={`text-3xl font-bold ${toneClass}`}>{value}</div>
-      <p className="mt-1 text-sm font-semibold text-content-muted">{label}</p>
-    </>
-  )
-
-  if (!onClick) {
-    return <article className="rounded-box border border-line bg-surface-alt p-5">{content}</article>
-  }
-
-  return (
-    <button className="rounded-box border border-line bg-surface-alt p-5 text-left transition hover:border-primary/40" onClick={onClick} type="button">
-      {content}
-    </button>
-  )
-}
-
 function TabButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return (
     <button
       aria-selected={active}
-      className={`tab min-h-11 text-sm font-semibold ${active ? 'tab-active' : ''}`}
+      className={`tab min-h-9 min-w-0 flex-1 truncate px-1.5 text-xs font-semibold sm:min-h-11 sm:flex-none sm:px-4 sm:text-sm ${active ? 'tab-active' : ''}`}
       onClick={onClick}
       role="tab"
       type="button"
     >
       {label}
     </button>
+  )
+}
+
+function InventoryListPagination({
+  onPageChange,
+  page,
+  totalPages,
+}: {
+  onPageChange: (page: number) => void
+  page: number
+  totalPages: number
+}) {
+  if (totalPages <= 1) return null
+
+  return (
+    <nav aria-label="Paginación" className="flex flex-col gap-3 border-t border-line pt-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-content-muted">
+        Página {page} de {totalPages}
+      </p>
+      <div className="join grid w-full grid-cols-2 sm:w-auto">
+        <button
+          aria-label="Página anterior"
+          className="btn btn-outline btn-sm join-item min-h-10"
+          disabled={page <= 1}
+          onClick={() => onPageChange(page - 1)}
+          type="button"
+        >
+          Anterior
+        </button>
+        <button
+          aria-label="Página siguiente"
+          className="btn btn-outline btn-sm join-item min-h-10"
+          disabled={page >= totalPages}
+          onClick={() => onPageChange(page + 1)}
+          type="button"
+        >
+          Siguiente
+        </button>
+      </div>
+    </nav>
   )
 }
 
@@ -547,7 +556,9 @@ function ProductStockCard({
 function StockView({
   expandedProductId,
   filteredProducts,
+  listPage,
   onExpand,
+  onListPageChange,
   onLoad,
   onSearch,
   onStockFilter,
@@ -556,13 +567,17 @@ function StockView({
 }: {
   expandedProductId: string | null
   filteredProducts: InventoryProduct[]
+  listPage: number
   onExpand: (productId: string | null) => void
+  onListPageChange: (page: number) => void
   onLoad: (intent: LoadIntent, productId?: string) => void
   onSearch: (value: string) => void
   onStockFilter: (filter: StockFilter) => void
   search: string
   stockFilter: StockFilter
 }) {
+  const { items: pageProducts, safePage, totalPages } = getInventoryPageSlice(filteredProducts, listPage)
+
   return (
     <div className="mt-6 space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -591,17 +606,20 @@ function StockView({
           <p className="mt-1 text-sm text-content-muted">Probá otro filtro o cargá el depósito desde Catálogo.</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {filteredProducts.map((product) => (
-            <ProductStockCard
-              expanded={expandedProductId === product.id}
-              key={product.id}
-              onExpand={onExpand}
-              onLoad={onLoad}
-              product={product}
-            />
-          ))}
-        </div>
+        <>
+          <div className="space-y-2">
+            {pageProducts.map((product) => (
+              <ProductStockCard
+                expanded={expandedProductId === product.id}
+                key={product.id}
+                onExpand={onExpand}
+                onLoad={onLoad}
+                product={product}
+              />
+            ))}
+          </div>
+          <InventoryListPagination onPageChange={onListPageChange} page={safePage} totalPages={totalPages} />
+        </>
       )}
     </div>
   )
@@ -609,23 +627,29 @@ function StockView({
 
 function CatalogView({
   categories,
+  listPage,
   onDeactivate,
   onEditCategory,
   onEditProduct,
+  onListPageChange,
   onNewCategory,
   onNewProduct,
   onReactivate,
   products,
 }: {
   categories: InventoryCategory[]
+  listPage: number
   onDeactivate: (product: InventoryProduct) => void
   onEditCategory: (category: InventoryCategory) => void
   onEditProduct: (product: InventoryProduct) => void
+  onListPageChange: (page: number) => void
   onNewCategory: () => void
   onNewProduct: () => void
   onReactivate: (product: InventoryProduct) => void
   products: InventoryProduct[]
 }) {
+  const { items: pageProducts, safePage, totalPages } = getInventoryPageSlice(products, listPage)
+
   return (
     <div className="mt-6 space-y-6">
       <div className="flex flex-wrap gap-2">
@@ -653,7 +677,7 @@ function CatalogView({
       )}
 
       <div className="space-y-3">
-        {products.map((product) => (
+        {pageProducts.map((product) => (
           <article className="flex flex-col gap-3 rounded-box border border-line bg-surface-alt p-4 sm:flex-row sm:items-center sm:justify-between" key={product.id}>
             <div>
               <div className="flex flex-wrap items-center gap-2">
@@ -684,11 +708,24 @@ function CatalogView({
           </article>
         ))}
       </div>
+      <InventoryListPagination onPageChange={onListPageChange} page={safePage} totalPages={totalPages} />
     </div>
   )
 }
 
-function MovementView({ movements, onCorrect }: { movements: InventoryMovement[]; onCorrect: (movement: InventoryMovement) => void }) {
+function MovementView({
+  listPage,
+  movements,
+  onCorrect,
+  onListPageChange,
+}: {
+  listPage: number
+  movements: InventoryMovement[]
+  onCorrect: (movement: InventoryMovement) => void
+  onListPageChange: (page: number) => void
+}) {
+  const { items: pageMovements, safePage, totalPages } = getInventoryPageSlice(movements, listPage)
+
   return (
     <div className="mt-6">
       {movements.length === 0 ? (
@@ -698,16 +735,17 @@ function MovementView({ movements, onCorrect }: { movements: InventoryMovement[]
           <p className="mt-1 text-sm text-content-muted">Las cargas, salidas y conteos aparecerán acá.</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {movements.map((movement) => {
-            const isIncrease =
-              movement.movementType === 'entry' ||
-              (movement.movementType === 'adjustment' && movement.resultingQuantity >= movement.previousQuantity)
-            const sign = isIncrease ? '+' : '-'
-            const cannotCorrect = movement.referenceType === 'delivery'
+        <>
+          <div className="space-y-3">
+            {pageMovements.map((movement) => {
+              const isIncrease =
+                movement.movementType === 'entry' ||
+                (movement.movementType === 'adjustment' && movement.resultingQuantity >= movement.previousQuantity)
+              const sign = isIncrease ? '+' : '-'
+              const cannotCorrect = movement.referenceType === 'delivery'
 
-            return (
-              <article className="flex flex-col gap-3 rounded-box border border-line bg-surface-alt p-4 sm:flex-row sm:items-center sm:justify-between" key={movement.id}>
+              return (
+                <article className="flex flex-col gap-3 rounded-box border border-line bg-surface-alt p-4 sm:flex-row sm:items-center sm:justify-between" key={movement.id}>
                 <div className="flex items-start gap-3">
                   <span
                     className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${
@@ -739,24 +777,31 @@ function MovementView({ movements, onCorrect }: { movements: InventoryMovement[]
                     <button className="btn btn-ghost btn-sm" onClick={() => onCorrect(movement)} type="button">Deshacer</button>
                   )}
                 </div>
-              </article>
-            )
-          })}
-        </div>
+                </article>
+              )
+            })}
+          </div>
+          <InventoryListPagination onPageChange={onListPageChange} page={safePage} totalPages={totalPages} />
+        </>
       )}
     </div>
   )
 }
 
 function BolsonesView({
+  listPage,
+  onListPageChange,
   onNewRecipe,
   onNewVersion,
   recipes,
 }: {
+  listPage: number
+  onListPageChange: (page: number) => void
   onNewRecipe: () => void
   onNewVersion: (recipe: RecipeSummary) => void
   recipes: RecipeSummary[]
 }) {
+  const { items: pageRecipes, safePage, totalPages } = getInventoryPageSlice(recipes, listPage)
   if (recipes.length === 0) {
     return (
       <div className="mt-6 rounded-box border border-dashed border-line bg-surface-alt p-8 text-center">
@@ -782,7 +827,7 @@ function BolsonesView({
         </button>
       </div>
       <div className="grid gap-4 lg:grid-cols-2">
-        {recipes.map((recipe) => (
+        {pageRecipes.map((recipe) => (
           <article className="rounded-box border border-line bg-surface-alt p-5" key={recipe.bundleId}>
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -825,6 +870,7 @@ function BolsonesView({
           </article>
         ))}
       </div>
+      <InventoryListPagination onPageChange={onListPageChange} page={safePage} totalPages={totalPages} />
     </div>
   )
 }

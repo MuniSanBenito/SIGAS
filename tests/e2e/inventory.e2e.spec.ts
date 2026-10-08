@@ -159,6 +159,22 @@ test('stock user can edit catalog items, undo a movement, and version a bolson',
   await expect(page.getByText('Versión 2')).toBeVisible()
 })
 
+test('stock list shows at most ten products per page', async ({ page }) => {
+  await login(page)
+  await page.getByRole('tab', { name: 'Stock' }).click()
+
+  const stockCards = page.locator('article.border-l-4')
+  await expect(stockCards.first()).toBeVisible()
+  expect(await stockCards.count()).toBeLessThanOrEqual(10)
+
+  const pagination = page.getByRole('navigation', { name: 'Paginación' })
+  if (await pagination.isVisible()) {
+    const firstCardName = await stockCards.first().getByRole('heading').innerText()
+    await page.getByRole('button', { name: 'Página siguiente' }).click()
+    await expect(stockCards.first().getByRole('heading')).not.toHaveText(firstCardName)
+  }
+})
+
 test('inventory remains usable without horizontal overflow at supported widths', async ({ page }) => {
   await login(page)
 
