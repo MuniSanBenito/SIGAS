@@ -542,7 +542,13 @@ describe('deliveries service', () => {
       assistances: [
         { kind: 'atmospheric', description: 'Temporal de septiembre' },
         { kind: 'money', description: 'Ayuda extraordinaria', amountPesos: 8000 },
-        { kind: 'orthopedic', description: 'Muletas', quantity: 1 },
+        {
+          kind: 'orthopedic',
+          description: 'Muletas',
+          quantity: 1,
+          loanedAt: '2026-09-20',
+          expectedReturnDate: '2026-10-20',
+        },
       ],
     })
     createdDeliveryIds.push(assistanceOnly.delivery.id)
@@ -603,6 +609,181 @@ describe('deliveries service', () => {
       code: 'CONFLICT',
       status: 409,
     })
+    expect(loan?.loanedAt?.slice(0, 10)).toBe('2026-09-20')
+    expect(loan?.expectedReturnDate?.slice(0, 10)).toBe('2026-10-20')
+  })
+
+  it('lends orthopedic stock and restores it on return, annulment, and rejection', async () => {
+    const req = { payload, user: actor } as unknown as DeliveryRequest
+    const loanProduct = (await payload.create({
+      collection: 'products',
+      data: {
+        category: categoryId,
+        isActive: true,
+        minimumStock: 0,
+        name: `Loan product ${runKey}`,
+        tracksLotExpiration: false,
+      },
+      overrideAccess: true,
+    })) as Product
+    await recordStockMovement({ payload, user: actor } as unknown as InventoryRequest, {
+      operationKey: `${runKey}-loan-entry`,
+      movement: {
+        mode: 'entry',
+        operationalDate: '2026-10-01',
+        productId: loanProduct.id,
+        quantity: 5,
+        reason: 'purchase',
+      },
+    })
+    const available = 5
+    const balanceKey = `${loanProduct.id}:general`
+
+    await expect(
+      confirmDelivery(req, {
+        groupId,
+        receiverContributorId: 'contrib-1',
+        receiverIsThirdParty: false,
+        deliveryDate: '2026-10-02',
+        operationKey: `${runKey}-loan-short`,
+        bundles: [],
+        lines: [],
+        assistances: [
+          {
+            kind: 'orthopedic',
+            description: 'Andador',
+            quantity: available + 1,
+            productId: loanProduct.id,
+            loanedAt: '2026-10-02',
+            expectedReturnDate: '2026-11-02',
+          },
+        ],
+      }),
+    ).rejects.toMatchObject({ code: 'INSUFFICIENT_STOCK', status: 409 })
+
+    const lent = await confirmDelivery(req, {
+      groupId,
+      receiverContributorId: 'contrib-1',
+      receiverIsThirdParty: false,
+      deliveryDate: '2026-10-02',
+      operationKey: `${runKey}-loan-stock`,
+      bundles: [],
+      lines: [],
+      assistances: [
+        {
+          kind: 'orthopedic',
+          description: 'Andador',
+          quantity: 2,
+          productId: loanProduct.id,
+          loanedAt: '2026-10-02',
+          expectedReturnDate: '2026-11-02',
+        },
+      ],
+    })
+    createdDeliveryIds.push(lent.delivery.id)
+    const loan = lent.assistances.find((item) => item.kind === 'orthopedic')
+    expect(loan?.loanStatus).toBe('loaned')
+
+    const afterLoan = await payload.find({
+      collection: 'stock-balances',
+      limit: 1,
+      overrideAccess: true,
+      where: { balanceKey: { equals: balanceKey } },
+    })
+    expect(afterLoan.docs[0]?.quantity).toBe(available - 2)
+
+    const loanMovements = await payload.find({
+      collection: 'stock-movements',
+      limit: 5,
+      overrideAccess: true,
+      where: {
+        and: [
+          { referenceId: { equals: loan?.id } },
+          { reason: { equals: 'loan' } },
+        ],
+      },
+    })
+    expect(loanMovements.totalDocs).toBe(1)
+
+    await expect(
+      returnOrthopedicAssistance(req, lent.delivery.id, loan?.id ?? '', { returnedAt: '2026-10-01' }),
+    ).rejects.toMatchObject({ code: 'VALIDATION_ERROR', status: 422 })
+
+    const returned = await returnOrthopedicAssistance(req, lent.delivery.id, loan?.id ?? '', {
+      returnedAt: '2026-10-15',
+    })
+    expect(returned.assistances.find((item) => item.id === loan?.id)?.returnedAt?.slice(0, 10)).toBe('2026-10-15')
+
+    const afterReturn = await payload.find({
+      collection: 'stock-balances',
+      limit: 1,
+      overrideAccess: true,
+      where: { balanceKey: { equals: balanceKey } },
+    })
+    expect(afterReturn.docs[0]?.quantity).toBe(available)
+
+    const returns = await payload.find({
+      collection: 'stock-movements',
+      limit: 5,
+      overrideAccess: true,
+      where: {
+        and: [
+          { referenceId: { equals: loan?.id } },
+          { reason: { equals: 'loan_return' } },
+        ],
+      },
+    })
+    expect(returns.totalDocs).toBe(1)
+
+    const annulled = await annulDelivery(req, lent.delivery.id, { reason: 'El préstamo ya se había devuelto' })
+    expect(annulled.delivery.status).toBe('annulled')
+    const afterAnnulReturned = await payload.find({
+      collection: 'stock-balances',
+      limit: 1,
+      overrideAccess: true,
+      where: { balanceKey: { equals: balanceKey } },
+    })
+    expect(afterAnnulReturned.docs[0]?.quantity).toBe(available)
+
+    const openLoan = await confirmDelivery(req, {
+      groupId,
+      receiverContributorId: 'contrib-1',
+      receiverIsThirdParty: false,
+      deliveryDate: '2026-10-03',
+      operationKey: `${runKey}-loan-open`,
+      bundles: [],
+      lines: [],
+      assistances: [
+        {
+          kind: 'orthopedic',
+          description: 'Muletas de depósito',
+          quantity: 1,
+          productId: loanProduct.id,
+          loanedAt: '2026-10-03',
+          expectedReturnDate: '2026-12-03',
+        },
+      ],
+    })
+    createdDeliveryIds.push(openLoan.delivery.id)
+    const annulOpen = await annulDelivery(req, openLoan.delivery.id, { reason: 'Se prestó de más' })
+    expect(annulOpen.delivery.status).toBe('annulled')
+    const afterAnnulOpen = await payload.find({
+      collection: 'stock-balances',
+      limit: 1,
+      overrideAccess: true,
+      where: { balanceKey: { equals: balanceKey } },
+    })
+    expect(afterAnnulOpen.docs[0]?.quantity).toBe(available)
+
+    const replay = await annulDelivery(req, openLoan.delivery.id, { reason: 'Reintento' })
+    expect(replay.delivery.status).toBe('annulled')
+    const afterReplay = await payload.find({
+      collection: 'stock-balances',
+      limit: 1,
+      overrideAccess: true,
+      where: { balanceKey: { equals: balanceKey } },
+    })
+    expect(afterReplay.docs[0]?.quantity).toBe(available)
   })
 
   it('links an optional report and keeps it out of public media', async () => {

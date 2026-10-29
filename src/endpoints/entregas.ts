@@ -32,6 +32,14 @@ async function requestBody(req: EntregaRequest): Promise<unknown> {
   return req.data
 }
 
+async function optionalRequestBody(req: EntregaRequest): Promise<unknown> {
+  try {
+    return await requestBody(req)
+  } catch {
+    return undefined
+  }
+}
+
 function requestUrl(req: EntregaRequest): URL {
   if (!req.url) throw new DeliveryError('INTERNAL_ERROR', 'URL de solicitud no disponible.', 500)
   return new URL(req.url)
@@ -102,7 +110,7 @@ async function returnAssistanceEndpoint(req: EntregaRequest): Promise<Response> 
     authorize(req)
     const deliveryId = req.routeParams?.id ?? ''
     const assistanceId = req.routeParams?.assistanceId ?? ''
-    const delivery = await returnOrthopedicAssistance(req, deliveryId, assistanceId)
+    const delivery = await returnOrthopedicAssistance(req, deliveryId, assistanceId, await optionalRequestBody(req))
     return Response.json({ doc: delivery })
   } catch (error) {
     return deliveryErrorResponse(error)

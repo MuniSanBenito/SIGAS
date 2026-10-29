@@ -75,6 +75,11 @@
   - Verify: `src/deliveries/validation.test.ts`, `src/endpoints/entregas.test.ts`, `tests/int/deliveries.int.spec.ts`, e2e role gating in `tests/e2e/roles.e2e.spec.ts`, `pnpm run build`, browser check of grupo → propuesta → confirmar → saldo.
   - Dependencies: 1.4, 2.1, 2.2, 0.2.
 
+- [x] **3.4 Orthopedic loans by stock**
+  - Acceptance: a loan can stay free-text or link a product; it stores loan and expected return dates; a stock loan exits on confirm and reenters on return; a second return and an annulled open loan do not double stock.
+  - Verify: `src/deliveries/validation.test.ts`, `tests/int/deliveries.int.spec.ts`, delivery workspace return flow.
+  - Dependencies: 2.1, 3.1.
+
 - [ ] **3.2 History and operational reports**
   - Acceptance: group-management read-only history, stock reports, delivery filters, optional area/unassigned category, and reference-barrio filters.
   - Verify: query and authorization tests plus manual report review.

@@ -436,6 +436,10 @@ export interface DeliveryAssistance {
   description: string;
   quantity?: number | null;
   amountPesos?: number | null;
+  product?: (string | null) | Product;
+  lot?: (string | null) | ProductLot;
+  loanedAt?: string | null;
+  expectedReturnDate?: string | null;
   loanStatus?: ('loaned' | 'returned') | null;
   returnedAt?: string | null;
   updatedAt: string;
@@ -903,6 +907,10 @@ export interface DeliveryAssistancesSelect<T extends boolean = true> {
   description?: T;
   quantity?: T;
   amountPesos?: T;
+  product?: T;
+  lot?: T;
+  loanedAt?: T;
+  expectedReturnDate?: T;
   loanStatus?: T;
   returnedAt?: T;
   updatedAt?: T;

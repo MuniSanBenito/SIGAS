@@ -45,13 +45,21 @@ function positiveInteger(value: unknown, field: string): number {
   return value
 }
 
-function deliveryDate(value: unknown): string {
-  const date = requiredString(value, 'deliveryDate')
+function calendarDate(value: unknown, field: string): string {
+  const date = requiredString(value, field)
   const parsed = new Date(`${date}T00:00:00.000Z`)
   if (!DATE_PATTERN.test(date) || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date) {
-    throw new DeliveryError('VALIDATION_ERROR', 'deliveryDate debe ser una fecha válida YYYY-MM-DD.', 422)
+    throw new DeliveryError('VALIDATION_ERROR', `${field} debe ser una fecha válida YYYY-MM-DD.`, 422)
   }
   return date
+}
+
+function deliveryDate(value: unknown): string {
+  return calendarDate(value, 'deliveryDate')
+}
+
+function hasValue(value: unknown): boolean {
+  return value !== undefined && value !== null && value !== ''
 }
 
 function parseBundleSelection(value: unknown): DeliveryBundleSelection {
@@ -124,11 +132,59 @@ function parseAssistance(value: unknown): DeliveryAssistanceInput {
     throw new DeliveryError('VALIDATION_ERROR', 'La cantidad es obligatoria.', 422)
   }
 
+  const quantity = positiveInteger(value.quantity, 'quantity')
+  if (assistanceKind !== 'orthopedic') {
+    if (hasValue(value.productId) || hasValue(value.lotId) || hasValue(value.loanedAt) || hasValue(value.expectedReturnDate)) {
+      throw new DeliveryError('VALIDATION_ERROR', 'Esta asistencia no admite datos de préstamo.', 422)
+    }
+    return { kind: assistanceKind, description, quantity }
+  }
+
+  const productId = optionalString(value.productId, 'productId')
+  const lotId = optionalString(value.lotId, 'lotId')
+  if (lotId && !productId) {
+    throw new DeliveryError('VALIDATION_ERROR', 'El lote requiere un producto.', 422)
+  }
+  const loanedAt = calendarDate(value.loanedAt, 'loanedAt')
+  const expectedReturnDate = calendarDate(value.expectedReturnDate, 'expectedReturnDate')
+  if (expectedReturnDate < loanedAt) {
+    throw new DeliveryError(
+      'VALIDATION_ERROR',
+      'La fecha de devolución no puede ser anterior a la entrega del préstamo.',
+      422,
+    )
+  }
+
   return {
     kind: assistanceKind,
     description,
-    quantity: positiveInteger(value.quantity, 'quantity'),
+    quantity,
+    loanedAt,
+    expectedReturnDate,
+    ...(productId ? { productId } : {}),
+    ...(lotId ? { lotId } : {}),
   }
+}
+
+export function parseReturnOrthopedicInput(input: unknown): { returnedAt?: string } {
+  if (input === undefined || input === null) return {}
+  if (!isRecord(input)) {
+    throw new DeliveryError('VALIDATION_ERROR', 'El cuerpo de la solicitud debe ser un objeto.', 422)
+  }
+  if (!hasValue(input.returnedAt)) return {}
+  if (typeof input.returnedAt !== 'string') {
+    throw new DeliveryError('VALIDATION_ERROR', 'returnedAt debe ser una fecha.', 422)
+  }
+  const value = input.returnedAt.trim()
+  if (DATE_PATTERN.test(value)) {
+    calendarDate(value, 'returnedAt')
+    return { returnedAt: `${value}T12:00:00.000Z` }
+  }
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    throw new DeliveryError('VALIDATION_ERROR', 'returnedAt debe ser una fecha válida.', 422)
+  }
+  return { returnedAt: parsed.toISOString() }
 }
 
 function assertNoDuplicateBundles(bundles: DeliveryBundleSelection[]): void {

@@ -75,6 +75,10 @@ type AssistanceView = {
   description: string
   quantity?: number | null
   amountPesos?: number | null
+  product?: string | { id: string; name: string } | null
+  lot?: string | { id: string; code: string } | null
+  loanedAt?: string | null
+  expectedReturnDate?: string | null
   loanStatus?: 'loaned' | 'returned' | null
   returnedAt?: string | null
 }
@@ -92,6 +96,12 @@ type DraftAssistance = {
   description: string
   quantity?: number
   amountPesos?: number
+  productId?: string
+  productName?: string
+  lotId?: string
+  lotCode?: string
+  loanedAt?: string
+  expectedReturnDate?: string
 }
 
 const assistanceKindOptions = [
@@ -116,12 +126,59 @@ type BundleVersionOption = {
   lines: { productId: string; quantity: number; productName: string }[]
 }
 
-type ProductOption = { id: string; name: string; tracksLotExpiration: boolean }
+type CatalogLot = { id: string; code: string; expirationDate: string }
+
+type ProductOption = { id: string; name: string; tracksLotExpiration: boolean; lots?: CatalogLot[] }
+
+function formatDay(value: string | null | undefined): string {
+  if (!value) return ''
+  const [year, month, day] = value.slice(0, 10).split('-')
+  if (!year || !month || !day) return value
+  return `${day}/${month}/${year}`
+}
+
+function assistanceProductName(assistance: AssistanceView): string | null {
+  if (!assistance.product) return null
+  return typeof assistance.product === 'string' ? 'Producto de depósito' : assistance.product.name
+}
+
+function loanIsOverdue(assistance: AssistanceView): boolean {
+  if (assistance.kind !== 'orthopedic' || assistance.loanStatus === 'returned' || !assistance.expectedReturnDate) {
+    return false
+  }
+  return assistance.expectedReturnDate.slice(0, 10) < todayKey()
+}
 
 type View = 'list' | 'detail' | 'create'
 
 function todayKey(): string {
   return new Date().toISOString().slice(0, 10)
+}
+
+function LoanReturnControl({
+  busy,
+  onReturn,
+}: {
+  busy: boolean
+  onReturn: (returnedAt: string) => void
+}) {
+  const [returnedAt, setReturnedAt] = useState(todayKey())
+  return (
+    <div className="flex flex-col gap-2 sm:items-end">
+      <label className="form-control gap-1">
+        <span className="label-text text-xs font-semibold">Fecha real de devolución</span>
+        <input
+          className="input input-bordered input-sm bg-surface"
+          onChange={(event) => setReturnedAt(event.target.value)}
+          type="date"
+          value={returnedAt}
+        />
+      </label>
+      <button className="btn btn-outline btn-sm" disabled={busy || !returnedAt} onClick={() => onReturn(returnedAt)} type="button">
+        {busy ? 'Registrando…' : 'Registrar devolución'}
+      </button>
+    </div>
+  )
 }
 
 export function EntregasWorkspace({ canAnnul = false }: { canAnnul?: boolean }) {
@@ -342,13 +399,15 @@ function DeliveryDetailPanel({ canAnnul, deliveryId, onBack }: { canAnnul: boole
     return () => { cancelled = true }
   }, [deliveryId])
 
-  async function markReturned(assistanceId: string) {
+  async function markReturned(assistanceId: string, returnedAt: string) {
     setReturningId(assistanceId)
     setError('')
     try {
       const response = await fetch(`/api/entregas/${deliveryId}/asistencias/${assistanceId}/devolver`, {
         method: 'POST',
         credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ returnedAt }),
       })
       const payload = await response.json().catch(() => null)
       if (!response.ok) throw new Error(errorMessage(payload, 'No se pudo registrar la devolución.'))
@@ -467,9 +526,11 @@ function DeliveryDetailPanel({ canAnnul, deliveryId, onBack }: { canAnnul: boole
 
       {detail.assistances.length > 0 && (
         <section className="mt-8 rounded-box border border-line bg-surface p-5 shadow-sm">
-          <h2 className="text-lg font-bold text-content">Asistencias sin stock</h2>
+          <h2 className="text-lg font-bold text-content">Asistencias</h2>
           <ul className="mt-4 space-y-3">
-            {detail.assistances.map((assistance) => (
+            {detail.assistances.map((assistance) => {
+              const productName = assistanceProductName(assistance)
+              return (
               <li className="flex flex-col gap-2 rounded-box border border-line bg-page px-4 py-3 sm:flex-row sm:items-center sm:justify-between" key={assistance.id}>
                 <div>
                   <p className="font-semibold text-content">{assistanceKindLabel(assistance.kind)}</p>
@@ -480,31 +541,36 @@ function DeliveryDetailPanel({ canAnnul, deliveryId, onBack }: { canAnnul: boole
                   {assistance.amountPesos != null && (
                     <p className="text-sm text-content-muted">Monto: ${assistance.amountPesos.toLocaleString('es-AR')}</p>
                   )}
+                  {assistance.kind === 'orthopedic' && (
+                    <p className="text-sm text-content-muted">
+                      {productName ? `Por stock: ${productName}` : 'Sin descuento de stock'}
+                      {assistance.loanedAt ? ` · Entrega ${formatDay(assistance.loanedAt)}` : ''}
+                      {assistance.expectedReturnDate ? ` · Devolución prevista ${formatDay(assistance.expectedReturnDate)}` : ''}
+                    </p>
+                  )}
+                  {loanIsOverdue(assistance) && <span className="badge badge-warning mt-2">Vencido</span>}
                 </div>
                 {detail.delivery.status !== 'annulled' && assistance.kind === 'orthopedic' && assistance.loanStatus !== 'returned' && (
-                  <button
-                    className="btn btn-outline btn-sm"
-                    disabled={returningId === assistance.id}
-                    onClick={() => void markReturned(assistance.id)}
-                    type="button"
-                  >
-                    {returningId === assistance.id ? 'Registrando…' : 'Registrar devolución'}
-                  </button>
+                  <LoanReturnControl
+                    busy={returningId === assistance.id}
+                    onReturn={(returnedAt) => void markReturned(assistance.id, returnedAt)}
+                  />
                 )}
                 {assistance.kind === 'orthopedic' && assistance.loanStatus === 'returned' && (
                   <span className="badge badge-success">
-                    Devuelto {assistance.returnedAt ? new Date(assistance.returnedAt).toLocaleString('es-AR') : ''}
+                    Devuelto {assistance.returnedAt ? formatDay(assistance.returnedAt) : ''}
                   </span>
                 )}
               </li>
-            ))}
+              )
+            })}
           </ul>
         </section>
       )}
 
       {annulOpen && (
         <AppDialog
-          description="La entrega queda visible como anulada. El stock de los productos vuelve al depósito. Después podés cargar la entrega correcta."
+          description="La entrega queda visible como anulada. El stock de los productos y de los préstamos abiertos vuelve al depósito. Después podés cargar la entrega correcta."
           onClose={() => { if (!annulling) setAnnulOpen(false) }}
           size="md"
           title="Anular entrega"
@@ -662,6 +728,10 @@ function CreateDeliveryPanel({ onBack, onCreated }: { onBack: () => void; onCrea
             description: item.description,
             ...(item.quantity === undefined ? {} : { quantity: item.quantity }),
             ...(item.amountPesos === undefined ? {} : { amountPesos: item.amountPesos }),
+            ...(item.productId ? { productId: item.productId } : {}),
+            ...(item.lotId ? { lotId: item.lotId } : {}),
+            ...(item.loanedAt ? { loanedAt: item.loanedAt } : {}),
+            ...(item.expectedReturnDate ? { expectedReturnDate: item.expectedReturnDate } : {}),
           })),
         }),
       })
@@ -724,6 +794,7 @@ function CreateDeliveryPanel({ onBack, onCreated }: { onBack: () => void; onCrea
         <ContentPicker
           assistances={assistances}
           bundleVersions={bundleVersions}
+          deliveryDate={deliveryDate}
           loadingProposal={loadingProposal}
           onBack={() => setStep(2)}
           onPropose={() => {
@@ -1009,6 +1080,7 @@ function ReceiverPicker(props: {
 function ContentPicker(props: {
   assistances: DraftAssistance[]
   bundleVersions: BundleVersionOption[]
+  deliveryDate: string
   loadingProposal: boolean
   onBack: () => void
   onPropose: () => void
@@ -1027,7 +1099,12 @@ function ContentPicker(props: {
   const [description, setDescription] = useState('')
   const [quantity, setQuantity] = useState(1)
   const [amountPesos, setAmountPesos] = useState(1)
+  const [loanProductId, setLoanProductId] = useState('')
+  const [loanLotId, setLoanLotId] = useState('')
+  const [loanedAt, setLoanedAt] = useState(props.deliveryDate)
+  const [expectedReturnDate, setExpectedReturnDate] = useState('')
   const [assistanceError, setAssistanceError] = useState('')
+  const loanProduct = props.products.find((item) => item.id === loanProductId)
 
   useEffect(() => {
     if (!props.bundleVersions.some((item) => item.id === bundleId)) {
@@ -1057,6 +1134,20 @@ function ContentPicker(props: {
       setAssistanceError('La cantidad es obligatoria.')
       return
     }
+    if (kind === 'orthopedic') {
+      if (!loanedAt || !expectedReturnDate) {
+        setAssistanceError('La fecha de entrega y la fecha de devolución son obligatorias.')
+        return
+      }
+      if (expectedReturnDate < loanedAt) {
+        setAssistanceError('La devolución no puede ser anterior a la entrega del préstamo.')
+        return
+      }
+      if (loanProduct?.tracksLotExpiration && !loanLotId) {
+        setAssistanceError('Este producto requiere un lote.')
+        return
+      }
+    }
     setAssistanceError('')
     props.setAssistances([
       ...props.assistances,
@@ -1066,9 +1157,30 @@ function ContentPicker(props: {
         description: trimmed,
         ...(quantityKinds.has(kind) ? { quantity } : {}),
         ...(kind === 'money' ? { amountPesos } : {}),
+        ...(kind === 'orthopedic'
+          ? {
+              loanedAt,
+              expectedReturnDate,
+              ...(loanProduct
+                ? {
+                    productId: loanProduct.id,
+                    productName: loanProduct.name,
+                    ...(loanLotId
+                      ? {
+                          lotId: loanLotId,
+                          lotCode: loanProduct.lots?.find((lot) => lot.id === loanLotId)?.code,
+                        }
+                      : {}),
+                  }
+                : {}),
+            }
+          : {}),
       },
     ])
     setDescription('')
+    setExpectedReturnDate('')
+    setLoanProductId('')
+    setLoanLotId('')
   }
 
   return (
@@ -1198,8 +1310,10 @@ function ContentPicker(props: {
       </article>
 
       <article className="rounded-box border border-line bg-surface p-5 shadow-sm">
-        <h2 className="text-lg font-bold text-content">Asistencia sin stock</h2>
-        <p className="mt-1 text-sm text-content-muted">No descuenta el depósito.</p>
+        <h2 className="text-lg font-bold text-content">Asistencias</h2>
+        <p className="mt-1 text-sm text-content-muted">
+          El préstamo ortopédico puede descontar stock si elegís un producto del depósito.
+        </p>
         <label className="form-control mt-3 gap-1">
           <span className="label-text font-semibold">Tipo</span>
           <select className="select select-bordered bg-page" onChange={(event) => setKind(event.target.value)} value={kind}>
@@ -1236,6 +1350,52 @@ function ContentPicker(props: {
             />
           </label>
         )}
+        {kind === 'orthopedic' && (
+          <>
+            <label className="form-control mt-3 gap-1">
+              <span className="label-text font-semibold">Producto del depósito</span>
+              <select
+                className="select select-bordered bg-page"
+                onChange={(event) => {
+                  setLoanProductId(event.target.value)
+                  setLoanLotId('')
+                }}
+                value={loanProductId}
+              >
+                <option value="">Sin descuento de stock</option>
+                {props.products.map((item) => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
+                ))}
+              </select>
+            </label>
+            {loanProduct?.tracksLotExpiration && (
+              <label className="form-control mt-3 gap-1">
+                <span className="label-text font-semibold">Lote</span>
+                <select className="select select-bordered bg-page" onChange={(event) => setLoanLotId(event.target.value)} value={loanLotId}>
+                  <option value="">Elegí un lote</option>
+                  {(loanProduct.lots ?? []).map((lot) => (
+                    <option key={lot.id} value={lot.id}>
+                      {lot.code} · vence {formatDay(lot.expirationDate)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <label className="form-control mt-3 gap-1">
+              <span className="label-text font-semibold">Fecha de entrega del préstamo</span>
+              <input className="input input-bordered bg-page" onChange={(event) => setLoanedAt(event.target.value)} type="date" value={loanedAt} />
+            </label>
+            <label className="form-control mt-3 gap-1">
+              <span className="label-text font-semibold">Fecha de devolución esperada</span>
+              <input
+                className="input input-bordered bg-page"
+                onChange={(event) => setExpectedReturnDate(event.target.value)}
+                type="date"
+                value={expectedReturnDate}
+              />
+            </label>
+          </>
+        )}
         {assistanceError && <p className="mt-2 text-sm text-error">{assistanceError}</p>}
         <button className="btn btn-outline btn-sm mt-3" onClick={addAssistance} type="button">
           Agregar asistencia
@@ -1248,6 +1408,8 @@ function ContentPicker(props: {
                   {assistanceKindLabel(item.kind)} · {item.description}
                   {item.quantity != null ? ` × ${item.quantity}` : ''}
                   {item.amountPesos != null ? ` · $${item.amountPesos.toLocaleString('es-AR')}` : ''}
+                  {item.productName ? ` · ${item.productName}` : ''}
+                  {item.expectedReturnDate ? ` · devuelve ${formatDay(item.expectedReturnDate)}` : ''}
                 </span>
                 <button
                   className="btn btn-ghost btn-xs"
@@ -1295,7 +1457,9 @@ function RealLinesReview(props: {
       <p className="mt-1 text-sm text-content-muted">
         {props.lines.length > 0
           ? 'Ajustá cantidades y, si querés, elegí el lote. Solo se descuenta lo que confirmes acá.'
-          : 'Esta entrega no descuenta stock.'}
+          : props.assistances.some((item) => item.productId)
+            ? 'El préstamo vinculado a un producto descuenta stock al confirmar y vuelve cuando se registra la devolución.'
+            : 'Esta entrega no descuenta stock.'}
       </p>
 
       {props.assistances.length > 0 && (
@@ -1305,6 +1469,10 @@ function RealLinesReview(props: {
               {assistanceKindLabel(item.kind)} · {item.description}
               {item.quantity != null ? ` × ${item.quantity}` : ''}
               {item.amountPesos != null ? ` · $${item.amountPesos.toLocaleString('es-AR')}` : ''}
+              {item.kind === 'orthopedic' && item.productName ? ` · stock ${item.productName}` : ''}
+              {item.kind === 'orthopedic' && !item.productName ? ' · sin stock' : ''}
+              {item.loanedAt ? ` · entrega ${formatDay(item.loanedAt)}` : ''}
+              {item.expectedReturnDate ? ` · devolución ${formatDay(item.expectedReturnDate)}` : ''}
             </li>
           ))}
         </ul>

@@ -433,6 +433,13 @@ export async function correctStockMovement(
   if (movement.referenceType === 'delivery') {
     throw new InventoryError('CONFLICT', 'Delivery movements must be corrected through delivery annulment', 409)
   }
+  if (movement.referenceType === 'delivery-assistance') {
+    throw new InventoryError(
+      'CONFLICT',
+      'Loan movements must be corrected through the loan return or delivery annulment',
+      409,
+    )
+  }
 
   const productId = relationId(movement.product)
   const lotId = movement.lot ? relationId(movement.lot) : undefined
@@ -506,6 +513,84 @@ export async function correctStockMovement(
     resultingQuantity: result.resultingQuantity,
     replayed: false,
   }
+}
+
+export async function compensateOpenLoanMovements(
+  req: InventoryRequest,
+  assistanceIds: string[],
+  reason: string,
+): Promise<number> {
+  if (assistanceIds.length === 0) return 0
+
+  const movements = await req.payload.find({
+    collection: 'stock-movements',
+    depth: 0,
+    limit: 1000,
+    overrideAccess: true,
+    req,
+    sort: 'createdAt',
+    where: {
+      and: [
+        { referenceType: { equals: 'delivery-assistance' } },
+        { referenceId: { in: assistanceIds } },
+        { reason: { equals: 'loan' } },
+        { status: { equals: 'active' } },
+      ],
+    },
+  })
+
+  const today = new Date().toISOString().slice(0, 10)
+  for (const movement of movements.docs as StockMovement[]) {
+    const operationKey = `annul-loan-${movement.id}`
+    const replayed = await findReplayedMovement(req, operationKey)
+    if (replayed) continue
+
+    const productId = relationId(movement.product)
+    const lotId = movement.lot ? relationId(movement.lot) : undefined
+    const current = await findBalance(req, balanceKey(productId, lotId))
+    const currentQuantity = current?.quantity ?? 0
+    const delta = -originalMovementDelta(movement)
+    const result = calculateStockResult(currentQuantity, delta)
+
+    await req.payload.create({
+      collection: 'stock-movements',
+      data: {
+        adjustmentDirection: delta >= 0 ? 'increase' : 'decrease',
+        adjustmentMode: 'manual',
+        correctionOf: movement.id,
+        createdBy: req.user.id,
+        lot: lotId,
+        movementType: 'adjustment',
+        observation: `Anulación de préstamo ${relationId(movement.referenceId)}`,
+        operationalDate: today,
+        operationKey,
+        previousQuantity: result.previousQuantity,
+        product: productId,
+        quantity: Math.abs(delta),
+        reason,
+        resultingQuantity: result.resultingQuantity,
+        source: 'correction',
+        status: 'active',
+      },
+      depth: 0,
+      draft: false,
+      overrideAccess: true,
+      req,
+    })
+
+    await req.payload.update({
+      collection: 'stock-movements',
+      data: { status: 'corrected' },
+      depth: 0,
+      id: movement.id,
+      overrideAccess: true,
+      req,
+    })
+
+    await saveBalance(req, productId, lotId, result.resultingQuantity, current)
+  }
+
+  return movements.totalDocs
 }
 
 export async function compensateDeliveryMovements(

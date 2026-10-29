@@ -4,7 +4,12 @@ import { getContribuyenteById } from '@/integrations/padron/san-benito-client'
 import type { Contribuyente } from '@/lib/contribuyente-map'
 import { canAccessModule, getRoles, hasRole } from '../access/roles'
 import { InventoryError } from '../inventory/errors'
-import { compensateDeliveryMovements, recordStockMovement, type InventoryRequest } from '../inventory/stock-service'
+import {
+  compensateDeliveryMovements,
+  compensateOpenLoanMovements,
+  recordStockMovement,
+  type InventoryRequest,
+} from '../inventory/stock-service'
 import type {
   Bundle,
   BundleVersion,
@@ -28,6 +33,7 @@ import {
   parseAnnulDeliveryInput,
   parseConfirmDeliveryInput,
   parseProposalInput,
+  parseReturnOrthopedicInput,
   totalsByProduct,
 } from './validation'
 
@@ -249,10 +255,17 @@ export type ProposalLineView = ProposedLine & {
   lots: { id: string; code: string; expirationDate: string; quantity: number }[]
 }
 
+export type DeliveryCatalogLot = {
+  id: string
+  code: string
+  expirationDate: string
+}
+
 export type DeliveryCatalogProduct = {
   id: string
   name: string
   tracksLotExpiration: boolean
+  lots: DeliveryCatalogLot[]
 }
 
 export type DeliveryCatalogBundle = {
@@ -325,11 +338,38 @@ export async function listDeliveryCatalog(req: DeliveryRequest): Promise<{
     productNameById.set(item.id, item.name)
   }
 
+  const lotProductIds = activeProducts.filter((item) => item.tracksLotExpiration).map((item) => item.id)
+  const lotsResult = lotProductIds.length
+    ? await req.payload.find({
+        collection: 'product-lots',
+        depth: 0,
+        limit: 1000,
+        overrideAccess: true,
+        req,
+        sort: 'expirationDate',
+        where: {
+          and: [{ product: { in: lotProductIds } }, { isActive: { equals: true } }],
+        },
+      })
+    : { docs: [] }
+  const lotsByProductId = new Map<string, DeliveryCatalogLot[]>()
+  for (const lot of lotsResult.docs as ProductLot[]) {
+    const productId = relationId(lot.product)
+    const current = lotsByProductId.get(productId) ?? []
+    current.push({
+      id: lot.id,
+      code: lot.code,
+      expirationDate: lot.expirationDate,
+    })
+    lotsByProductId.set(productId, current)
+  }
+
   return {
     products: activeProducts.map((item) => ({
       id: item.id,
       name: item.name,
       tracksLotExpiration: Boolean(item.tracksLotExpiration),
+      lots: lotsByProductId.get(item.id) ?? [],
     })),
     bundleVersions: versions
       .filter((version) => bundleNameById.has(relationId(version.bundle)))
@@ -481,7 +521,7 @@ async function loadReport(req: DeliveryRequest, report: Delivery['report']): Pro
 async function loadAssistances(req: DeliveryRequest, deliveryId: string): Promise<DeliveryAssistance[]> {
   const result = await req.payload.find({
     collection: 'delivery-assistances',
-    depth: 0,
+    depth: 1,
     limit: 100,
     overrideAccess: true,
     req,
@@ -566,6 +606,62 @@ export async function listDeliveries(
     page: result.page ?? options.page,
     totalPages: result.totalPages,
     limit: options.limit,
+  }
+}
+
+async function assertOrthopedicStock(req: DeliveryRequest, parsed: ConfirmDeliveryInput): Promise<void> {
+  const loans = parsed.assistances.filter((item) => item.kind === 'orthopedic' && item.productId)
+  if (loans.length === 0) return
+
+  const products = new Map<string, Product>()
+  for (const loan of loans) {
+    const productId = loan.productId
+    if (!productId) continue
+    if (!products.has(productId)) products.set(productId, await getProduct(req, productId))
+    const product = products.get(productId)
+    if (!product) throw new DeliveryError('NOT_FOUND', 'Producto no encontrado.', 404)
+    if (!product.isActive) {
+      throw new DeliveryError('CONFLICT', `El producto ${product.name} no está activo.`, 409)
+    }
+    if (product.tracksLotExpiration && !loan.lotId) {
+      throw new DeliveryError('VALIDATION_ERROR', `El producto ${product.name} requiere un lote.`, 422)
+    }
+    if (!product.tracksLotExpiration && loan.lotId) {
+      throw new DeliveryError('VALIDATION_ERROR', `El producto ${product.name} no usa lotes.`, 422)
+    }
+    if (loan.lotId && loan.loanedAt) {
+      await validateLineLot(req, product, loan.lotId, loan.loanedAt)
+    }
+  }
+
+  const lineReserved = new Map<string, number>()
+  for (const line of parsed.lines) {
+    const key = `${line.productId}:${line.lotId ?? 'general'}`
+    lineReserved.set(key, (lineReserved.get(key) ?? 0) + line.quantity)
+  }
+
+  const demand = new Map<string, { product: Product; lotId?: string; quantity: number }>()
+  for (const loan of loans) {
+    const productId = loan.productId
+    const product = productId ? products.get(productId) : undefined
+    if (!productId || !product || !loan.quantity) continue
+    const key = `${productId}:${loan.lotId ?? 'general'}`
+    const current = demand.get(key)
+    if (current) current.quantity += loan.quantity
+    else demand.set(key, { product, lotId: loan.lotId, quantity: loan.quantity })
+  }
+
+  for (const [key, item] of demand) {
+    const available = await getBalance(req, item.product.id, item.lotId)
+    const remaining = available - (lineReserved.get(key) ?? 0)
+    if (remaining < item.quantity) {
+      throw new DeliveryError(
+        'INSUFFICIENT_STOCK',
+        `Stock insuficiente para ${item.product.name}. Disponible: ${Math.max(remaining, 0)}, solicitado: ${item.quantity}.`,
+        409,
+        { productId: item.product.id, lotId: item.lotId, available: Math.max(remaining, 0), requested: item.quantity },
+      )
+    }
   }
 }
 
@@ -687,12 +783,15 @@ export async function confirmDelivery(req: DeliveryRequest, input: unknown): Pro
     }
   }
 
+  await assertOrthopedicStock(req, parsed)
+
   const transactionID = await req.payload.db.beginTransaction()
-  if (transactionID === null) {
-    throw new DeliveryError('INTERNAL_ERROR', 'No se pudo iniciar la transacción de entrega.', 500)
-  }
-  const txReq = { ...req, transactionID } as DeliveryRequest
-  const inventoryReq = { ...req, transactionID, user: actor } as unknown as InventoryRequest
+  const txReq = (transactionID ? { ...req, transactionID } : req) as DeliveryRequest
+  const inventoryReq = {
+    ...req,
+    ...(transactionID ? { transactionID } : {}),
+    user: actor,
+  } as unknown as InventoryRequest
 
   try {
     const delivery = (await txReq.payload.create({
@@ -798,20 +897,52 @@ export async function confirmDelivery(req: DeliveryRequest, input: unknown): Pro
       }
     }
 
+    let assistanceIndex = 0
     for (const assistance of parsed.assistances) {
-      await txReq.payload.create({
+      assistanceIndex += 1
+      const created = (await txReq.payload.create({
         collection: 'delivery-assistances',
         data: {
           ...(assistance.amountPesos === undefined ? {} : { amountPesos: assistance.amountPesos }),
           delivery: delivery.id,
           description: assistance.description,
+          ...(assistance.expectedReturnDate ? { expectedReturnDate: assistance.expectedReturnDate } : {}),
           kind: assistance.kind,
           ...(assistance.kind === 'orthopedic' ? { loanStatus: 'loaned' as const } : {}),
+          ...(assistance.loanedAt ? { loanedAt: assistance.loanedAt } : {}),
+          ...(assistance.lotId ? { lot: assistance.lotId } : {}),
+          ...(assistance.productId ? { product: assistance.productId } : {}),
           ...(assistance.quantity === undefined ? {} : { quantity: assistance.quantity }),
         },
         overrideAccess: true,
         req: txReq,
-      })
+      })) as DeliveryAssistance
+
+      if (assistance.kind === 'orthopedic' && assistance.productId && assistance.quantity && assistance.loanedAt) {
+        const stockResult = await recordStockMovement(inventoryReq, {
+          operationKey: `${operationKey}:loan:${assistanceIndex}`,
+          movement: {
+            mode: 'exit',
+            productId: assistance.productId,
+            ...(assistance.lotId ? { lotId: assistance.lotId } : {}),
+            operationalDate: assistance.loanedAt,
+            observation: `Préstamo ortopédico ${created.id}`,
+            source: 'loan',
+            quantity: assistance.quantity,
+            reason: 'loan',
+          },
+        })
+        const movementId = stockResult.movement?.id
+        if (movementId) {
+          await txReq.payload.update({
+            collection: 'stock-movements',
+            data: { referenceId: created.id, referenceType: 'delivery-assistance' },
+            id: movementId,
+            overrideAccess: true,
+            req: txReq,
+          })
+        }
+      }
     }
 
     if (parsed.reportId) {
@@ -838,10 +969,10 @@ export async function confirmDelivery(req: DeliveryRequest, input: unknown): Pro
       targetType: 'delivery',
     })
 
-    await txReq.payload.db.commitTransaction(transactionID)
+    if (transactionID) await txReq.payload.db.commitTransaction(transactionID)
     return getDeliveryById(req, delivery.id)
   } catch (error) {
-    await req.payload.db.rollbackTransaction(transactionID)
+    if (transactionID) await req.payload.db.rollbackTransaction(transactionID)
     throw error
   }
 }
@@ -903,11 +1034,12 @@ export async function annulDelivery(
   }
 
   const transactionID = await req.payload.db.beginTransaction()
-  if (transactionID === null) {
-    throw new DeliveryError('INTERNAL_ERROR', 'No se pudo iniciar la transacción de anulación.', 500)
-  }
-  const txReq = { ...req, transactionID } as DeliveryRequest
-  const inventoryReq = { ...req, transactionID, user: actor } as unknown as InventoryRequest
+  const txReq = (transactionID ? { ...req, transactionID } : req) as DeliveryRequest
+  const inventoryReq = {
+    ...req,
+    ...(transactionID ? { transactionID } : {}),
+    user: actor,
+  } as unknown as InventoryRequest
 
   try {
     const fresh = (await txReq.payload.findByID({
@@ -918,11 +1050,23 @@ export async function annulDelivery(
       req: txReq,
     })) as Delivery
     if (fresh.status === 'annulled') {
-      await txReq.payload.db.commitTransaction(transactionID)
+      if (transactionID) await txReq.payload.db.commitTransaction(transactionID)
       return getDeliveryById(req, fresh.id)
     }
 
     const compensated = await compensateDeliveryMovements(inventoryReq, fresh.id, reason)
+    const assistanceResult = await txReq.payload.find({
+      collection: 'delivery-assistances',
+      depth: 0,
+      limit: 100,
+      overrideAccess: true,
+      req: txReq,
+      where: { delivery: { equals: fresh.id } },
+    })
+    const openLoanIds = (assistanceResult.docs as DeliveryAssistance[])
+      .filter((assistance) => assistance.kind === 'orthopedic' && assistance.product && assistance.loanStatus !== 'returned')
+      .map((assistance) => assistance.id)
+    const compensatedLoans = await compensateOpenLoanMovements(inventoryReq, openLoanIds, reason)
     const annulledAt = new Date().toISOString()
     await txReq.payload.update({
       collection: 'deliveries',
@@ -940,16 +1084,16 @@ export async function annulDelivery(
       action: 'deliveries.annulled',
       after: { annulledAt, status: 'annulled' },
       before: { status: 'confirmed' },
-      context: { compensatedMovements: compensated },
+      context: { compensatedLoans, compensatedMovements: compensated },
       reason,
       result: 'success',
       targetId: fresh.id,
       targetType: 'delivery',
     })
-    await txReq.payload.db.commitTransaction(transactionID)
+    if (transactionID) await txReq.payload.db.commitTransaction(transactionID)
     return getDeliveryById(req, fresh.id)
   } catch (error) {
-    await req.payload.db.rollbackTransaction(transactionID)
+    if (transactionID) await req.payload.db.rollbackTransaction(transactionID)
     if (error instanceof InventoryError) {
       throw new DeliveryError(
         error.status === 409 ? 'CONFLICT' : 'VALIDATION_ERROR',
@@ -961,12 +1105,18 @@ export async function annulDelivery(
   }
 }
 
+function dayKey(value: string): string {
+  return value.slice(0, 10)
+}
+
 export async function returnOrthopedicAssistance(
   req: DeliveryRequest,
   deliveryId: string,
   assistanceId: string,
+  input?: unknown,
 ): Promise<HydratedDelivery> {
   const actor = assertDeliveryOperator(req)
+  const { returnedAt: requestedReturn } = parseReturnOrthopedicInput(input)
   const delivery = await getDeliveryById(req, deliveryId)
   if (delivery.delivery.status === 'annulled') {
     throw new DeliveryError('CONFLICT', 'No se puede registrar una devolución de una entrega anulada.', 409)
@@ -994,23 +1144,87 @@ export async function returnOrthopedicAssistance(
     throw new DeliveryError('CONFLICT', 'El elemento ya fue devuelto.', 409)
   }
 
-  const returnedAt = new Date().toISOString()
-  await req.payload.update({
-    collection: 'delivery-assistances',
-    data: { loanStatus: 'returned', returnedAt },
-    id: assistance.id,
-    overrideAccess: true,
-    req,
-  })
-  await auditDeliveryAction(req, actor, {
-    action: 'deliveries.assistance-returned',
-    after: { assistanceId: assistance.id, loanStatus: 'returned', returnedAt },
-    before: { loanStatus: assistance.loanStatus ?? 'loaned' },
-    result: 'success',
-    targetId: deliveryId,
-    targetType: 'delivery',
-  })
-  return getDeliveryById(req, deliveryId)
+  const returnedAt = requestedReturn ?? new Date().toISOString()
+  if (assistance.loanedAt && dayKey(returnedAt) < dayKey(assistance.loanedAt)) {
+    throw new DeliveryError(
+      'VALIDATION_ERROR',
+      'La fecha de devolución no puede ser anterior a la entrega del préstamo.',
+      422,
+    )
+  }
+
+  const transactionID = await req.payload.db.beginTransaction()
+  const txReq = (transactionID ? { ...req, transactionID } : req) as DeliveryRequest
+  const inventoryReq = {
+    ...req,
+    ...(transactionID ? { transactionID } : {}),
+    user: actor,
+  } as unknown as InventoryRequest
+
+  try {
+    const fresh = (await txReq.payload.findByID({
+      collection: 'delivery-assistances',
+      depth: 0,
+      id: assistance.id,
+      overrideAccess: true,
+      req: txReq,
+    })) as DeliveryAssistance
+    if (fresh.loanStatus === 'returned') {
+      throw new DeliveryError('CONFLICT', 'El elemento ya fue devuelto.', 409)
+    }
+
+    if (fresh.product) {
+      if (!fresh.quantity || fresh.quantity < 1) {
+        throw new DeliveryError('VALIDATION_ERROR', 'El préstamo no tiene una cantidad válida.', 422)
+      }
+      const productId = relationId(fresh.product)
+      const lotId = fresh.lot ? relationId(fresh.lot) : undefined
+      const stockResult = await recordStockMovement(inventoryReq, {
+        operationKey: `loan-return:${fresh.id}`,
+        movement: {
+          mode: 'entry',
+          ...(lotId ? { lotId } : {}),
+          observation: `Devolución de préstamo ${fresh.id}`,
+          operationalDate: dayKey(returnedAt),
+          productId,
+          quantity: fresh.quantity,
+          reason: 'loan_return',
+          source: 'loan',
+        },
+      })
+      const movementId = stockResult.movement?.id
+      if (movementId) {
+        await txReq.payload.update({
+          collection: 'stock-movements',
+          data: { referenceId: fresh.id, referenceType: 'delivery-assistance' },
+          id: movementId,
+          overrideAccess: true,
+          req: txReq,
+        })
+      }
+    }
+
+    await txReq.payload.update({
+      collection: 'delivery-assistances',
+      data: { loanStatus: 'returned', returnedAt },
+      id: fresh.id,
+      overrideAccess: true,
+      req: txReq,
+    })
+    await auditDeliveryAction(txReq, actor, {
+      action: 'deliveries.assistance-returned',
+      after: { assistanceId: fresh.id, loanStatus: 'returned', returnedAt },
+      before: { loanStatus: fresh.loanStatus ?? 'loaned' },
+      result: 'success',
+      targetId: deliveryId,
+      targetType: 'delivery',
+    })
+    if (transactionID) await txReq.payload.db.commitTransaction(transactionID)
+    return getDeliveryById(req, deliveryId)
+  } catch (error) {
+    if (transactionID) await req.payload.db.rollbackTransaction(transactionID)
+    throw error
+  }
 }
 
 export type GroupDeliveryHistoryLine = {

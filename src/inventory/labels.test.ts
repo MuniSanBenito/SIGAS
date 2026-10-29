@@ -5,6 +5,8 @@ import { inventoryErrorMessage, movementReasonLabel } from './labels'
 describe('inventory labels', () => {
   it('maps movement reasons to Spanish labels', () => {
     expect(movementReasonLabel('purchase')).toBe('Compra')
+    expect(movementReasonLabel('loan')).toBe('Préstamo')
+    expect(movementReasonLabel('loan_return')).toBe('Devolución de préstamo')
     expect(movementReasonLabel('loss')).toBe('Pérdida')
     expect(movementReasonLabel('physicalCount')).toBe('Conteo')
     expect(movementReasonLabel('unknown')).toBe('Otro')

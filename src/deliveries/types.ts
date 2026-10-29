@@ -28,6 +28,10 @@ export type DeliveryAssistanceInput = {
   description: string
   quantity?: number
   amountPesos?: number
+  productId?: string
+  lotId?: string
+  loanedAt?: string
+  expectedReturnDate?: string
 }
 
 export type ConfirmDeliveryInput = {

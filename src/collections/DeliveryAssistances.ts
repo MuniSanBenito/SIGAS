@@ -78,16 +78,54 @@ export const DeliveryAssistances: CollectionConfig = {
       },
     },
     {
+      name: 'product',
+      type: 'relationship',
+      relationTo: 'products',
+      admin: {
+        condition: (data) => data?.kind === 'orthopedic',
+      },
+    },
+    {
+      name: 'lot',
+      type: 'relationship',
+      relationTo: 'product-lots',
+      admin: {
+        condition: (data) => data?.kind === 'orthopedic',
+      },
+    },
+    {
+      name: 'loanedAt',
+      type: 'date',
+      admin: {
+        condition: (data) => data?.kind === 'orthopedic',
+        date: { pickerAppearance: 'dayOnly' },
+      },
+    },
+    {
+      name: 'expectedReturnDate',
+      type: 'date',
+      admin: {
+        condition: (data) => data?.kind === 'orthopedic',
+        date: { pickerAppearance: 'dayOnly' },
+      },
+    },
+    {
       name: 'loanStatus',
       type: 'select',
       options: [
         { label: 'Prestado', value: 'loaned' },
         { label: 'Devuelto', value: 'returned' },
       ],
+      admin: {
+        condition: (data) => data?.kind === 'orthopedic',
+      },
     },
     {
       name: 'returnedAt',
       type: 'date',
+      admin: {
+        condition: (data) => data?.kind === 'orthopedic',
+      },
     },
   ],
   indexes: [{ fields: ['delivery'] }],

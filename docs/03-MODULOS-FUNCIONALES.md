@@ -71,8 +71,8 @@ Funciones:
 - Unidad de medida basada en unidades enteras.
 - Stock mínimo configurable por producto.
 - Control de lote/vencimiento para productos sensibles.
-- Entradas por compra o donación.
-- Salidas por entrega, vencimiento, pérdida, rotura o ajuste.
+- Entradas por compra, donación o devolución de un préstamo ortopédico.
+- Salidas por entrega, vencimiento, pérdida, rotura, ajuste o préstamo ortopédico.
 - Selección manual de lote en entradas y entregas sensibles.
 - Alertas de stock mínimo y vencimiento.
 - Historial de movimientos.
@@ -108,6 +108,9 @@ Funciones:
 - Generar movimientos de salida por el contenido real.
 - Guardar fecha de entrega, fecha/hora de confirmación, usuario y observaciones.
 - Consultar historial por grupo, persona, período, producto, bolsón y área.
+- Registrar un préstamo ortopédico libre o vinculado a un producto del depósito.
+- Exigir fecha de entrega y fecha de devolución esperada en el préstamo.
+- Registrar la devolución real y, si el préstamo salió de stock, reponer la cantidad.
 
 El MVP registra entregas efectivas. No incluye solicitudes, reservas, preparaciones ni estados de no retirada.
 

@@ -106,6 +106,25 @@ flowchart TD
 
 Una fecha futura sigue descontando stock al confirmar; se conserva por separado la fecha/hora real de confirmación.
 
+## Flujo 5b — Préstamo ortopédico y devolución
+
+```mermaid
+flowchart TD
+    A[Operador carga préstamo ortopédico] --> B{Vincula producto de stock?}
+    B -- No --> C[Guarda descripción, cantidad y fechas]
+    B -- Sí --> D{Hay saldo y lote si corresponde?}
+    D -- No --> E[Rechaza la confirmación]
+    D -- Sí --> F[Confirma y genera salida loan]
+    C --> G[Queda prestado]
+    F --> G
+    G --> H[Registra devolución con fecha real]
+    H --> I{Era por stock?}
+    I -- Sí --> J[Genera entrada loan_return]
+    I -- No --> K[Solo marca devuelto]
+```
+
+La fecha de devolución esperada no puede ser anterior a la fecha de entrega del préstamo. La fecha real de devolución tampoco. Una segunda devolución no vuelve a sumar stock. Anular la entrega compensa un préstamo por stock que sigue abierto y no revierte uno ya devuelto.
+
 ## Flujo 6 — Salida no asociada a entrega
 
 ```mermaid

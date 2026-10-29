@@ -16,14 +16,14 @@
 | Contribuyentes | Base municipal | Consulta y alta/actualización mediante adaptador en vivo |
 | Usuarios, autenticación y permisos | MongoDB/Payload | Administración interna |
 | Grupos y membresías | MongoDB/SIGAS | Creación y mantenimiento manual |
-| Productos, lotes y stock | MongoDB/SIGAS | Operación de Control de stock |
+| Productos, lotes y stock | MongoDB/SIGAS | Operación de Depósito |
 | Recetas y versiones de bolsones | MongoDB/SIGAS | Planificación y trazabilidad |
 | Entregas y detalles reales | MongoDB/SIGAS | Historial y reportes |
 | Auditoría | MongoDB/SIGAS, con protección de escritura | Trazabilidad de todas las acciones sensibles |
 
 ## Operaciones contra el padrón
 
-SIGAS no guarda una copia local del contribuyente. Cada alta o actualización se ejecuta contra la base municipal mediante el adaptador y debe registrar en Mongo un resultado técnico de integración, sin convertirse en una fuente alternativa. El ciclo comienza en `solicitada` y termina en un estado final:
+SIGAS no guarda una copia local del contribuyente. Cada alta o actualización se ejecuta contra la base municipal mediante el adaptador y debe registrar en Mongo un resultado técnico de integración, sin convertirse en una fuente alternativa:
 
 - `solicitada`: operación iniciada;
 - `confirmada`: la base municipal confirmó el cambio;
@@ -118,7 +118,7 @@ Documento de autenticación y autorización administrado por Payload/Mongo.
 Campos conceptuales:
 
 - `id`;
-- `dni_login` único y normalizado: sin puntos, espacios ni guiones, solo dígitos y conservando ceros iniciales;
+- `dni_login` único y normalizado;
 - `nombre`;
 - `activo`;
 - `requiere_cambio_password`;
@@ -131,7 +131,7 @@ La contraseña la gestiona el mecanismo de autenticación; nunca se guarda en te
 ### `AREA`, `ROL` y `PERMISO`
 
 - `AREA` representa una pertenencia funcional de intervención.
-- `ROL` representa una función del sistema, por ejemplo Administrador, Control de stock o Administración.
+- `ROL` representa una función del sistema, por ejemplo Administrador, Depósito o Gestión de grupos.
 - `PERMISO` representa una acción sobre un módulo, por ejemplo `entregas.confirmar` o `stock.ajustar`.
 
 Área y rol son dimensiones independientes. Un usuario transversal puede no pertenecer a un área de intervención.
@@ -178,10 +178,7 @@ Catálogo configurable. Debe incluir opciones institucionales y una opción `otr
 - `unidad`: unidades enteras en el MVP;
 - `controla_lote_vencimiento`: booleano;
 - `stock_minimo`;
-- `activo`;
-- `motivo_baja` opcional cuando se desactiva lógicamente.
-
-Una desactivación lógica no elimina el producto ni su historial. Si conserva saldo, sigue visible para consultas y puede seleccionarse para salidas, pero no para nuevas entradas ni recetas. Una vez que el producto tiene movimientos, `controla_lote_vencimiento` no puede cambiarse.
+- `activo`.
 
 ### `LOTE_PRODUCTO`
 
@@ -194,7 +191,7 @@ Solo se usa cuando el producto está configurado para control de lote/vencimient
 - estado;
 - timestamps.
 
-En una entrega, el Administrador selecciona manualmente el lote cuando corresponde.
+En una entrega, Depósito selecciona manualmente el lote cuando corresponde.
 
 ### `STOCK_SALDO`
 
@@ -215,17 +212,15 @@ Libro de movimientos de inventario:
 - `producto_id`;
 - `lote_id` opcional;
 - `tipo`: entrada, salida o ajuste;
-- `cantidad` entera positiva para movimientos persistidos;
-- `direccion_ajuste` opcional: aumento o disminución cuando el tipo es ajuste;
-- `modo_ajuste` opcional: movimiento manual o conteo físico;
-- `motivo`: compra, donación, entrega, vencimiento, pérdida, rotura, ajuste o conteo físico;
+- `cantidad` entera;
+- `motivo`: compra, donación, entrega, vencimiento, pérdida, rotura, ajuste, préstamo (`loan`) o devolución de préstamo (`loan_return`);
 - `fecha_operativa`;
 - `creado_en`;
 - `usuario_id`;
 - `referencia_tipo` y `referencia_id`, por ejemplo una entrega;
 - estado de corrección/auditoría.
 
-Los movimientos pueden ser corregidos por usuarios autorizados mediante un movimiento compensatorio: el registro original permanece en el libro con estado corregido y nunca se reescribe. Los valores anteriores y nuevos quedan en `AUDIT_LOG`.
+Los movimientos pueden ser corregidos por usuarios autorizados, pero la modificación conserva valores anteriores y nuevos en `AUDIT_LOG`.
 
 ## Bolsones y recetas
 
@@ -312,6 +307,22 @@ La receta se expande como propuesta inicial y el operador define explícitamente
 
 Una entrega puede tener varias recetas, líneas modificadas y productos sueltos. Las líneas de producto son la fuente del descuento real de stock.
 
+### `ENTREGA_ASISTENCIA` — préstamo ortopédico
+
+Una asistencia puede ser un préstamo ortopédico en dos modos:
+
+- **libre:** descripción y cantidad, sin producto. No mueve stock;
+- **por stock:** además vincula un producto activo y, si controla lote, un lote. Al confirmar genera una salida `loan`. Al devolver genera una entrada `loan_return` por la misma cantidad.
+
+Campos propios del préstamo:
+
+- `loanedAt`: fecha de entrega del préstamo;
+- `expectedReturnDate`: fecha de devolución esperada, igual o posterior a `loanedAt`;
+- `loanStatus`: `loaned` o `returned`;
+- `returnedAt`: fecha real de devolución, no anterior a `loanedAt`.
+
+Si la entrega se anula con el préstamo todavía abierto, la salida `loan` se compensa y el saldo vuelve. Si ya fue devuelto, la entrada `loan_return` no se revierte.
+
 ## Auditoría
 
 ### `AUDIT_LOG`
@@ -335,8 +346,6 @@ Debe auditar login, altas, cambios, bajas lógicas, permisos, contribuyentes, gr
 - Toda línea real de entrega tiene producto y cantidad positiva entera.
 - Una entrega confirmada genera movimientos de salida consistentes con sus líneas.
 - El saldo y el libro de movimientos deben coincidir después de cada operación.
-- Una salida nunca puede dejar saldo negativo.
-- Un conteo físico sin diferencia audita la verificación, pero no crea un movimiento de cantidad cero.
 - Una receta histórica no cambia al crear una nueva versión.
 - Un tercero receptor debe ser un contribuyente existente y tener autorización registrada.
 - Un contribuyente puede tener varias membresías activas, pero cada membresía tiene su propio ciclo de vida.

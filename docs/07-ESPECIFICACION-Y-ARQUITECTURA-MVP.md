@@ -50,7 +50,8 @@ El MVP funciona cuando:
 - productos con unidades enteras;
 - lotes/vencimientos configurables por producto;
 - entradas por compra o donación;
-- salidas por entrega, vencimiento, pérdida, rotura o ajuste;
+- salidas por entrega, vencimiento, pérdida, rotura, ajuste o préstamo ortopédico;
+- préstamos ortopédicos libres o por stock, con fecha de entrega, fecha de devolución esperada y devolución que repone stock;
 - recetas versionadas;
 - entregas mixtas de varios bolsones/versiones y productos sueltos;
 - destino grupal o individual;

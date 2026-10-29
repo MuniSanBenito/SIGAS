@@ -136,6 +136,7 @@ test('administration records an assistance delivery with a report and a returned
 
   await page.getByLabel('Tipo').selectOption({ label: 'Préstamo ortopédico' })
   await page.getByLabel('Descripción').fill('Muletas')
+  await page.getByLabel('Fecha de devolución esperada').fill('2026-12-01')
   await page.getByRole('button', { name: 'Agregar asistencia' }).click()
   await page.getByRole('button', { name: 'Ver propuesta' }).click()
 

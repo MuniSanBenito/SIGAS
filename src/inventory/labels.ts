@@ -4,6 +4,8 @@ export const MOVEMENT_REASON_LABELS: Record<string, string> = {
   delivery: 'Entrega',
   donation: 'Donación',
   expiration: 'Vencimiento',
+  loan: 'Préstamo',
+  loan_return: 'Devolución de préstamo',
   loss: 'Pérdida',
   physicalCount: 'Conteo',
   purchase: 'Compra',
@@ -40,6 +42,8 @@ const ERROR_MESSAGE_LABELS: Record<string, string> = {
   'Correction movements cannot be corrected again': 'No se puede deshacer una corrección.',
   'Delivery movements must be corrected through delivery annulment':
     'Los movimientos de entrega se corrigen anulando la entrega.',
+  'Loan movements must be corrected through the loan return or delivery annulment':
+    'Los movimientos de préstamo se corrigen con la devolución o anulando la entrega.',
   'Expired lots cannot receive new stock': 'No se puede cargar stock en un lote vencido.',
   'Inactive bundles cannot receive new versions': 'Este bolsón ya no acepta versiones nuevas.',
   'Inactive lots cannot be used': 'El lote ya no está disponible.',

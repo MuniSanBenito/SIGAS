@@ -120,6 +120,93 @@ describe('delivery validation', () => {
     ).toThrow('no lleva monto')
   })
 
+  it('requires loan dates and keeps stock linkage optional', () => {
+    expect(() =>
+      parseConfirmDeliveryInput({
+        ...base,
+        bundles: [],
+        lines: [],
+        assistances: [{ kind: 'orthopedic', description: 'Muletas', quantity: 1 }],
+      }),
+    ).toThrow('loanedAt')
+
+    const freeLoan = parseConfirmDeliveryInput({
+      ...base,
+      bundles: [],
+      lines: [],
+      assistances: [
+        {
+          kind: 'orthopedic',
+          description: 'Muletas',
+          quantity: 1,
+          loanedAt: '2026-10-01',
+          expectedReturnDate: '2026-11-01',
+        },
+      ],
+    })
+    expect(freeLoan.assistances[0]).toEqual({
+      kind: 'orthopedic',
+      description: 'Muletas',
+      quantity: 1,
+      loanedAt: '2026-10-01',
+      expectedReturnDate: '2026-11-01',
+    })
+
+    const stockLoan = parseConfirmDeliveryInput({
+      ...base,
+      bundles: [],
+      lines: [],
+      assistances: [
+        {
+          kind: 'orthopedic',
+          description: 'Muletas de depósito',
+          quantity: 2,
+          productId: 'product-1',
+          lotId: 'lot-1',
+          loanedAt: '2026-10-01',
+          expectedReturnDate: '2026-10-01',
+        },
+      ],
+    })
+    expect(stockLoan.assistances[0]?.productId).toBe('product-1')
+    expect(stockLoan.assistances[0]?.lotId).toBe('lot-1')
+
+    expect(() =>
+      parseConfirmDeliveryInput({
+        ...base,
+        bundles: [],
+        lines: [],
+        assistances: [
+          {
+            kind: 'orthopedic',
+            description: 'Muletas',
+            quantity: 1,
+            loanedAt: '2026-11-02',
+            expectedReturnDate: '2026-11-01',
+          },
+        ],
+      }),
+    ).toThrow('anterior a la entrega')
+
+    expect(() =>
+      parseConfirmDeliveryInput({
+        ...base,
+        bundles: [],
+        lines: [],
+        assistances: [
+          {
+            kind: 'orthopedic',
+            description: 'Muletas',
+            quantity: 1,
+            lotId: 'lot-1',
+            loanedAt: '2026-10-01',
+            expectedReturnDate: '2026-11-01',
+          },
+        ],
+      }),
+    ).toThrow('El lote requiere un producto')
+  })
+
   it('keeps an optional report id', () => {
     const result = parseConfirmDeliveryInput({ ...base, reportId: 'report-1' })
     expect(result.reportId).toBe('report-1')

@@ -72,6 +72,16 @@ Incluidos:
 - Después del primer movimiento no se puede cambiar si el producto controla lote/vencimiento.
 - Las recetas de bolsones se incluyen en el mismo corte y cada modificación crea una nueva versión inmutable.
 
+### 7. Préstamos ortopédicos
+
+**Regla adoptada:** un préstamo ortopédico puede ser libre o por stock.
+
+- Libre: no descuenta el depósito.
+- Por stock: al confirmar sale la cantidad (`loan`). Al devolver entra la misma cantidad (`loan_return`).
+- Fechas obligatorias: entrega del préstamo y devolución esperada. La devolución real se carga al devolver.
+- Sin saldo suficiente no se confirma el préstamo por stock. No hay saldo negativo.
+- Anulación con préstamo abierto: se compensa la salida. Anulación con préstamo ya devuelto: no se revierte la devolución.
+
 ## Aprobación operativa
 
 - Encargado/a de Depósito: `provisional — avance autorizado por el responsable del proyecto`

@@ -1,5 +1,5 @@
-export const entryReasons = ['purchase', 'donation', 'adjustment'] as const
-export const exitReasons = ['expiration', 'loss', 'breakage', 'adjustment', 'delivery'] as const
+export const entryReasons = ['purchase', 'donation', 'adjustment', 'loan_return'] as const
+export const exitReasons = ['expiration', 'loss', 'breakage', 'adjustment', 'delivery', 'loan'] as const
 
 export type EntryReason = (typeof entryReasons)[number]
 export type ExitReason = (typeof exitReasons)[number]
