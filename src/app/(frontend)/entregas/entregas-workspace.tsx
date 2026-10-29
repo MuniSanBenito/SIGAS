@@ -142,6 +142,20 @@ function assistanceProductName(assistance: AssistanceView): string | null {
   return typeof assistance.product === 'string' ? 'Producto de depósito' : assistance.product.name
 }
 
+function loanReturnSummary(assistances: AssistanceView[]): string {
+  const loans = assistances.filter((assistance) => assistance.kind === 'orthopedic')
+  if (loans.length === 0) return '—'
+  return loans
+    .map((loan) => {
+      if (loan.loanStatus === 'returned') {
+        return loan.returnedAt ? `Devuelto ${formatDay(loan.returnedAt)}` : 'Devuelto'
+      }
+      if (loan.expectedReturnDate) return `Prevista ${formatDay(loan.expectedReturnDate)}`
+      return 'Sin fecha'
+    })
+    .join(' · ')
+}
+
 function loanIsOverdue(assistance: AssistanceView): boolean {
   if (assistance.kind !== 'orthopedic' || assistance.loanStatus === 'returned' || !assistance.expectedReturnDate) {
     return false
@@ -292,6 +306,7 @@ function DeliveriesListPanel({ onCreate, onOpen }: { onCreate: () => void; onOpe
                   <th>Líneas</th>
                   <th>Unidades</th>
                   <th>Asistencias</th>
+                  <th>Devolución</th>
                   <th>Confirmada</th>
                   <th><span className="sr-only">Acciones</span></th>
                 </tr>
@@ -299,7 +314,7 @@ function DeliveriesListPanel({ onCreate, onOpen }: { onCreate: () => void; onOpe
               <tbody>
                 {docs.length === 0 ? (
                   <tr>
-                    <td className="py-12 text-center text-content-muted" colSpan={7}>
+                    <td className="py-12 text-center text-content-muted" colSpan={8}>
                       Todavía no hay entregas confirmadas.
                     </td>
                   </tr>
@@ -320,6 +335,7 @@ function DeliveriesListPanel({ onCreate, onOpen }: { onCreate: () => void; onOpe
                       <td>{item.lineCount}</td>
                       <td>{item.totalUnits}</td>
                       <td>{item.assistanceCount}</td>
+                      <td className="whitespace-nowrap text-sm">{loanReturnSummary(item.assistances)}</td>
                       <td>{new Date(item.delivery.confirmedAt).toLocaleString('es-AR')}</td>
                       <td>
                         <button className="btn btn-ghost btn-sm" onClick={() => onOpen(item.delivery.id)} type="button">
@@ -1322,6 +1338,23 @@ function ContentPicker(props: {
             ))}
           </select>
         </label>
+        {kind === 'orthopedic' && (
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <label className="form-control gap-1">
+              <span className="label-text font-semibold">Fecha de entrega del préstamo</span>
+              <input className="input input-bordered bg-page" onChange={(event) => setLoanedAt(event.target.value)} type="date" value={loanedAt} />
+            </label>
+            <label className="form-control gap-1">
+              <span className="label-text font-semibold">Fecha de devolución esperada</span>
+              <input
+                className="input input-bordered bg-page"
+                onChange={(event) => setExpectedReturnDate(event.target.value)}
+                type="date"
+                value={expectedReturnDate}
+              />
+            </label>
+          </div>
+        )}
         <label className="form-control mt-3 gap-1">
           <span className="label-text font-semibold">{kind === 'money' ? 'Concepto' : 'Descripción'}</span>
           <input className="input input-bordered bg-page" onChange={(event) => setDescription(event.target.value)} value={description} />
@@ -1381,19 +1414,6 @@ function ContentPicker(props: {
                 </select>
               </label>
             )}
-            <label className="form-control mt-3 gap-1">
-              <span className="label-text font-semibold">Fecha de entrega del préstamo</span>
-              <input className="input input-bordered bg-page" onChange={(event) => setLoanedAt(event.target.value)} type="date" value={loanedAt} />
-            </label>
-            <label className="form-control mt-3 gap-1">
-              <span className="label-text font-semibold">Fecha de devolución esperada</span>
-              <input
-                className="input input-bordered bg-page"
-                onChange={(event) => setExpectedReturnDate(event.target.value)}
-                type="date"
-                value={expectedReturnDate}
-              />
-            </label>
           </>
         )}
         {assistanceError && <p className="mt-2 text-sm text-error">{assistanceError}</p>}
